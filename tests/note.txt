@@ -1,0 +1,69 @@
+13 Years old Male presents to the emergency department with brought in by ambulance and accompanied by
+police, after an altercation with his mother. He lost a phone charger and his mother became upset, and went after him with a bat,
+and swung at him and hit him in the left elbow as he lifted his arm to protect himself. She didn’t hit him with the bat anywhere
+else but had made some attempts. He admits left sided rib tenderness that he wasn’t aware of until now, but mild. No difficulty
+breathing. No abdominal pain. He denies other ares of injury such as head, neck, back, or other extremity injuries. Police present
+and CPS case opened. Father is not in the picture and there was report of a grandmother who might be available.
+Past Medical History
+Problems
+Active
+No Chronic Problems
+No qualifying data available
+Allergies: No Known Medication Allergies
+Review of systems: As noted in HPI
+Primary Care Physician if documented: Mekikyan, MD, Anna
+Physical Exam:
+Triage vitals: 12/16/23 21:55 T: 98.0 F HR: 110 BP: 122/76 SPO2: 99% O2 Delivery: Room air
+General: Alert, no acute distress. Holding his left arm across his chest.
+Skin: Warm, dry, pink, intact, mild redness of skin about left elbow.
+Head: Normocephalic, atraumatic. No hematoma. No mastoid tenderness.
+Neck: Supple, no swelling. Non-tender.
+Eye: Normal conjunctiva.
+Ears, nose, mouth and throat: No facial abnormalities. Moist mucus membranes. No facial tenderness or swelling, small
+bruise to forehead, non-tender. No septal hematoma. No perioribtal or mastoid ecchymoses. Oral cavity nomral.
+Cardiovascular: Regular rate and rhythm, No murmur, Normal peripheral perfusion. 2+ distal pulses of extremities, including
+2+ radial pulse of left arm, with good cap refill.
+Respiratory: Lungs are clear, respirations are non-labored.
+Gastrointestinal: Soft, Nontender, Non distended,
+Musculoskeletal: No obvious deformities or swelling. Mild left lateral chest wall tenderness, no crepitans.
+Neurological: Alert and oriented, No focal deficit observed. Moves all fingers normally on left hand. Neuro intact.
+Psychiatric: Cooperative, appropriate for context. Calm, cooperative. Articulate and in good spirits.
+ED Course:
+Medical Decision Making: Patient seen and evaluated, given the presentation: multiple injuries including fractures,
+dislocations, contusions, sprains, strains, and other occult injuries.
+After initial evaluation and considering this differential diagnosis further workup was warranted and pursued as noted below.
+Additional management consisted of the following:
+Treatment:
+acetaminophen, 600 mg, 18.74 mL, ORAL, ONCE
+Diagnostics:
+Labs All 24H Results Not Found in Electronic Medical Record
+Imaging:
+X-ray left elbow: left supracondylar fracture, with intrarticular extension.
+Chest x-ray: no acute findings
+Comorbidities affecting health:
+Problems
+Active
+No Chronic Problems
+External chart review: Records from previous hospitalization and procedures
+Additional sources for history not mentioned above: EMS Police. Social work.
+Management discussed with additional providers not already noted above: police
+Discussion of radiology results with radiologist: no
+Independent interpretation performed: diagnostics as noted above.
+Social determinants of health: Lives with just his mother, no father in the picture, poor social support system.
+Tests considered but not performed: labs, imaging such as CT scans.
+Prescriptions considered but not given: none
+Re-evaluation and Summary:
+Escalation of care (observation/admission) considered: Admitted patient. The patient's condition required additional management
+and care was escalated to admission.
+He is resting comfortably neurovascular intact, has evidence of a supracondylar fracture with intra-articular extension,
+required long-arm splint, post pin placement checked and good had good CMS. Discussed case with Children's Hospital to
+arrange for transfer but she given the need for possible orthopedic intervention and the social situation with the child productive
+services being involved. Police are aware and present with the patient.
+Impression and Plan:
+Impression:
+Diagnoses This Visit
+Arm injury - Minor (BEB111E5-07F6-4DC7-91BF-3EA1D801D5E8)
+Closed head injury without LOC (8D476BB6-C0C4-400D-8902-A9A50BF7E405)
+Supracondylar fracture of left humerus (S42.412A)
+Condition: stable
+Disposition: Transfer to Children's hospital
