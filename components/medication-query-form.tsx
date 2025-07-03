@@ -9,10 +9,14 @@ import { useToast } from '@/hooks/use-toast'
 import { ProgressIndicator, ProgressStep } from '@/components/ui/progress-indicator'
 import { useAuth } from '@/contexts/AuthContext'
 import { isLocalhost } from '@/lib/utils'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface QueryResponse {
   response: string
   medication: string | null
+  intents: string[]
+  fdaSections: string[]
   fdaData: any
   queryId?: string
 }
@@ -44,7 +48,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   const { session } = useAuth()
   
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([
-    { id: 'identify', label: 'Identifying medication', status: 'pending' },
+    { id: 'identify', label: 'Identifying medication & intent', status: 'pending' },
     { id: 'search', label: 'Searching FDA documents', status: 'pending' },
     { id: 'generate', label: 'Generating query', status: 'pending' },
     { id: 'respond', label: 'Generating response', status: 'pending' },
@@ -57,6 +61,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       setResponse({
         response: selectedQuery.ai_response,
         medication: selectedQuery.medication_name,
+        intents: selectedQuery.detected_intents,
+        fdaSections: selectedQuery.fda_sections,
         fdaData: selectedQuery.fda_response || null,
         queryId: selectedQuery.id
       })
@@ -142,7 +148,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
 
   const resetProgress = () => {
     setProgressSteps([
-      { id: 'identify', label: 'Identifying medication', status: 'pending' },
+      { id: 'identify', label: 'Identifying medication & intent', status: 'pending' },
       { id: 'search', label: 'Searching FDA documents', status: 'pending' },
       { id: 'generate', label: 'Generating query', status: 'pending' },
       { id: 'respond', label: 'Generating response', status: 'pending' },
@@ -177,7 +183,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     resetProgress()
 
     try {
-      // Step 1: Extract medication name
+      // Step 1: Extract medication name and intent
       updateStepStatus('identify', 'active')
       const extractResponse = await fetch('/api/extract-medication', {
         method: 'POST',
@@ -187,10 +193,10 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
 
       if (!extractResponse.ok) {
         updateStepStatus('identify', 'error')
-        throw new Error('Failed to extract medication')
+        throw new Error('Failed to extract medication and intent')
       }
 
-      const { medication } = await extractResponse.json()
+      const { medication, intents, fdaSections } = await extractResponse.json()
       updateStepStatus('identify', 'completed')
 
       // Step 2: Generate AI response with FDA data
@@ -204,7 +210,12 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       const generateResponse = await fetch('/api/generate-response', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ query, medication }),
+        body: JSON.stringify({ 
+          query, 
+          medication, 
+          intents, 
+          fdaSections 
+        }),
       })
 
       if (!generateResponse.ok) {
@@ -227,6 +238,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
           body: JSON.stringify({
             userQuery: query,
             extractedMedication: medication,
+            detectedIntents: intents,
+            fdaSections: fdaSections,
             openfdaResponse: responseData.fdaData,
             aiResponse: responseData.response,
           }),
@@ -485,7 +498,12 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                         </div>
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap">{restOfText}</div>
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-blockquote:text-muted-foreground prose-code:text-foreground prose-pre:bg-muted prose-pre:text-foreground"
+                    >
+                      {restOfText}
+                    </ReactMarkdown>
                   </div>
                 )
               })()}

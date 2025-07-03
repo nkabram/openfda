@@ -15,19 +15,50 @@ interface OpenFDAResponse {
     warnings?: string[]
     contraindications?: string[]
     adverse_reactions?: string[]
+    adverse_reactions_table?: string[]
     indications_and_usage?: string[]
     dosage_and_administration?: string[]
+    dosage_and_administration_table?: string[]
+    dosage_forms_and_strengths?: string[]
     drug_interactions?: string[]
+    
+    active_ingredient?: string[]
+    inactive_ingredient?: string[]
+    
+    boxed_warning?: string[]
+    precautions?: string[]
+    general_precautions?: string[]
+    user_safety_warnings?: string[]
+    
+    pregnancy?: string[]
+    pregnancy_table?: string[]
+    teratogenic_effects?: string[]
+    nursing_mothers?: string[]
+    lactation?: string[]
+    pediatric_use?: string[]
+    geriatric_use?: string[]
+    labor_and_delivery?: string[]
+    use_in_specific_populations?: string[]
+    
+    when_using?: string[]
+    stop_use?: string[]
+    patient_medication_information?: string[]
+    
+    description?: string[]
+    purpose?: string[]
+    animal_pharmacology_and_or_toxicology?: string[]
+    carcinogenesis_and_mutagenesis?: string[]
+    storage_and_handling?: string[]
+    how_supplied?: string[]
   }>
 }
 
-async function searchMedicationInOpenFDA(medicationName: string): Promise<OpenFDAResponse | null> {
+async function searchMedicationInOpenFDA(medicationName: string, limit: number = 5): Promise<OpenFDAResponse | null> {
   try {
     const cleanMedication = medicationName.trim().toLowerCase()
     const apiKey = process.env.OPENFDA_API_KEY
     const baseUrl = 'https://api.fda.gov/drug/label.json'
     
-    // Try multiple search strategies
     const searchQueries = [
       `openfda.generic_name:"${cleanMedication}"`,
       `openfda.brand_name:"${cleanMedication}"`,
@@ -36,7 +67,7 @@ async function searchMedicationInOpenFDA(medicationName: string): Promise<OpenFD
     ]
 
     for (const searchQuery of searchQueries) {
-      const url = `${baseUrl}?search=${encodeURIComponent(searchQuery)}&limit=5${apiKey ? `&api_key=${apiKey}` : ''}`
+      const url = `${baseUrl}?search=${encodeURIComponent(searchQuery)}&limit=${limit}${apiKey ? `&api_key=${apiKey}` : ''}`
       
       const response = await fetch(url)
       if (response.ok) {
@@ -54,9 +85,74 @@ async function searchMedicationInOpenFDA(medicationName: string): Promise<OpenFD
   }
 }
 
+function extractRelevantSections(results: any[], fdaSections: string[], intents: string[]) {
+  if (!results || results.length === 0) return null
+
+  const relevantData = results.map(result => {
+    const extractedData: any = {
+      openfda: result.openfda || {},
+      sections: {}
+    }
+
+    fdaSections.forEach(section => {
+      if (result[section]) {
+        extractedData.sections[section] = result[section]
+      }
+    })
+
+    return extractedData
+  })
+
+  return {
+    results: relevantData,
+    intents,
+    fdaSections
+  }
+}
+
+function formatFDAContext(fdaData: any, medication: string, intents: string[]) {
+  if (!fdaData || !fdaData.results || fdaData.results.length === 0) {
+    return ''
+  }
+
+  let context = `FDA Drug Information for ${medication}:\n\n`
+  
+  const firstResult = fdaData.results[0]
+  if (firstResult.openfda) {
+    context += `Brand Names: ${firstResult.openfda.brand_name?.join(', ') || 'Not specified'}\n`
+    context += `Generic Names: ${firstResult.openfda.generic_name?.join(', ') || 'Not specified'}\n`
+    context += `Manufacturer: ${firstResult.openfda.manufacturer_name?.join(', ') || 'Not specified'}\n\n`
+  }
+
+  const intentLabels = {
+    'dosage_administration': 'DOSAGE AND ADMINISTRATION',
+    'ingredients': 'INGREDIENTS',
+    'indications_purpose': 'INDICATIONS AND USAGE',
+    'contraindications_warnings': 'CONTRAINDICATIONS AND WARNINGS',
+    'adverse_reactions': 'ADVERSE REACTIONS',
+    'special_populations': 'SPECIAL POPULATIONS',
+    'description_info': 'DRUG INFORMATION'
+  }
+
+  fdaData.results.forEach((result: any, index: number) => {
+    if (index > 0) {
+      context += `\n--- Additional Product Information ---\n`
+    }
+
+    Object.entries(result.sections || {}).forEach(([sectionKey, sectionValue]) => {
+      if (Array.isArray(sectionValue) && sectionValue.length > 0) {
+        const sectionTitle = sectionKey.replace(/_/g, ' ').toUpperCase()
+        context += `\n${sectionTitle}:\n${sectionValue.join('\n')}\n`
+      }
+    })
+  })
+
+  return context.trim()
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { query, medication, openfdaData } = await request.json()
+    const { query, medication, intents, fdaSections, openfdaData } = await request.json()
 
     if (!query || typeof query !== 'string') {
       return NextResponse.json(
@@ -65,44 +161,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch OpenFDA data if medication is provided and data not already fetched
     let fdaData = openfdaData
     if (medication && !fdaData) {
-      fdaData = await searchMedicationInOpenFDA(medication)
+      const rawFdaData = await searchMedicationInOpenFDA(medication, 3)
+      if (rawFdaData && fdaSections && fdaSections.length > 0) {
+        fdaData = extractRelevantSections(rawFdaData.results || [], fdaSections, intents || [])
+      }
     }
 
-    // Prepare context for AI response - truncate to avoid token limits
-    let context = ''
-    if (fdaData && fdaData.results && fdaData.results.length > 0) {
-      const result = fdaData.results[0]
-      
-      // Helper function to truncate text to avoid token limits
-      const truncateText = (text: string, maxLength: number = 500) => {
-        if (text.length <= maxLength) return text
-        return text.substring(0, maxLength) + '...'
-      }
-      
-      const joinAndTruncate = (arr: string[] | undefined, maxLength: number = 300) => {
-        if (!arr || arr.length === 0) return 'Not specified'
-        const joined = arr.join(' ')
-        return truncateText(joined, maxLength)
-      }
-      
-      context = `
-FDA Drug Information for ${medication}:
-
-Brand Names: ${result.openfda?.brand_name?.join(', ') || 'Not specified'}
-Generic Names: ${result.openfda?.generic_name?.join(', ') || 'Not specified'}
-Manufacturer: ${result.openfda?.manufacturer_name?.join(', ') || 'Not specified'}
-
-Indications and Usage: ${joinAndTruncate(result.indications_and_usage, 400)}
-Dosage and Administration: ${joinAndTruncate(result.dosage_and_administration, 300)}
-Warnings: ${joinAndTruncate(result.warnings, 400)}
-Contraindications: ${joinAndTruncate(result.contraindications, 200)}
-Adverse Reactions: ${joinAndTruncate(result.adverse_reactions, 300)}
-Drug Interactions: ${joinAndTruncate(result.drug_interactions, 300)}
-      `.trim()
-    }
+    const context = fdaData ? formatFDAContext(fdaData, medication, intents || []) : ''
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -114,14 +181,16 @@ Drug Interactions: ${joinAndTruncate(result.drug_interactions, 300)}
 Guidelines:
 1. Always prioritize FDA-approved information when available
 2. Be clear about the source of your information
-3. If no FDA data is available, decline to provide an answer. 
-4. Be concise but comprehensive
-5. Use clear, accessible language, for a medical professional audience, ie doctors, pharmacists, physician assistants, nurse practitioners, and nurses
+3. If no FDA data is available, decline to provide an answer
+4. Be comprehensive but well-organized
+5. Use clear, accessible language for a medical professional audience (doctors, pharmacists, physician assistants, nurse practitioners, and nurses)
+6. When multiple products are available, mention the variations if relevant
+7. Focus your response on the specific intent of the user's question
 
 RESPONSE FORMAT:
 Start your response with "**Bottom Line:** [One sentence summary that directly answers the user's question]"
 
-Then provide the detailed explanation below.`
+Then provide the detailed explanation below, organized by relevant sections.`
         },
         {
           role: 'user',
@@ -129,11 +198,11 @@ Then provide the detailed explanation below.`
 
 ${context ? `FDA Data Available:\n${context}` : 'No specific FDA data available for this query.'}
 
-Please provide a helpful response to the user's question.`
+Please provide a helpful response to the user's question, focusing on the specific information they requested.`
         }
       ],
       temperature: 0.1,
-      max_tokens: 1000,
+      max_tokens: 2000,
     })
 
     const response = completion.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response to your question.'
@@ -141,6 +210,8 @@ Please provide a helpful response to the user's question.`
     return NextResponse.json({
       response,
       medication,
+      intents: intents || [],
+      fdaSections: fdaSections || [],
       fdaData: fdaData || null
     })
   } catch (error) {
