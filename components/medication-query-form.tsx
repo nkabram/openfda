@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Send } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { ProgressIndicator, ProgressStep } from '@/components/ui/progress-indicator'
 
 interface QueryResponse {
   response: string
@@ -17,7 +18,30 @@ export function MedicationQueryForm() {
   const [query, setQuery] = useState('')
   const [response, setResponse] = useState<QueryResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([
+    { id: 'identify', label: 'Identifying medication', status: 'pending' },
+    { id: 'search', label: 'Searching FDA documents', status: 'pending' },
+    { id: 'generate', label: 'Generating query', status: 'pending' },
+    { id: 'respond', label: 'Generating response', status: 'pending' },
+  ])
   const { toast } = useToast()
+
+  const updateStepStatus = (stepId: string, status: ProgressStep['status']) => {
+    setProgressSteps(prev => 
+      prev.map(step => 
+        step.id === stepId ? { ...step, status } : step
+      )
+    )
+  }
+
+  const resetProgress = () => {
+    setProgressSteps([
+      { id: 'identify', label: 'Identifying medication', status: 'pending' },
+      { id: 'search', label: 'Searching FDA documents', status: 'pending' },
+      { id: 'generate', label: 'Generating query', status: 'pending' },
+      { id: 'respond', label: 'Generating response', status: 'pending' },
+    ])
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,9 +56,11 @@ export function MedicationQueryForm() {
 
     setIsLoading(true)
     setResponse(null)
+    resetProgress()
 
     try {
       // Step 1: Extract medication name
+      updateStepStatus('identify', 'active')
       const extractResponse = await fetch('/api/extract-medication', {
         method: 'POST',
         headers: {
@@ -44,12 +70,22 @@ export function MedicationQueryForm() {
       })
 
       if (!extractResponse.ok) {
+        updateStepStatus('identify', 'error')
         throw new Error('Failed to extract medication')
       }
 
       const { medication } = await extractResponse.json()
+      updateStepStatus('identify', 'completed')
 
-      // Step 2: Generate AI response with FDA data
+      // Step 2: Generate AI response with FDA data (this includes searching FDA docs and generating the response)
+      updateStepStatus('search', 'active')
+      
+      // Simulate the search step completion after a brief delay
+      setTimeout(() => {
+        updateStepStatus('search', 'completed')
+        updateStepStatus('generate', 'active')
+      }, 500)
+
       const generateResponse = await fetch('/api/generate-response', {
         method: 'POST',
         headers: {
@@ -59,11 +95,16 @@ export function MedicationQueryForm() {
       })
 
       if (!generateResponse.ok) {
+        updateStepStatus('generate', 'error')
         throw new Error('Failed to generate response')
       }
 
+      updateStepStatus('generate', 'completed')
+      updateStepStatus('respond', 'active')
+
       const responseData = await generateResponse.json()
       setResponse(responseData)
+      updateStepStatus('respond', 'completed')
 
       // Step 3: Save query to database
       try {
@@ -143,6 +184,18 @@ export function MedicationQueryForm() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Progress Indicator */}
+      {isLoading && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Processing Your Query</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ProgressIndicator steps={progressSteps} />
+          </CardContent>
+        </Card>
+      )}
 
       {response && (
         <Card>
