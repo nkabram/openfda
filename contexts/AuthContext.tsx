@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { isLocalhost } from '@/lib/utils'
 
 interface AuthContextType {
   user: User | null
@@ -18,8 +19,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    // Wait for client-side hydration before checking localhost
+    if (!isClient) return
+
+    // Skip authentication setup for localhost
+    if (isLocalhost()) {
+      setLoading(false)
+      return
+    }
+
     // Get initial session
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -40,9 +55,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [isClient])
 
   const signInWithGoogle = async () => {
+    // Don't allow sign in on localhost - show alert instead
+    if (isClient && isLocalhost()) {
+      alert('Authentication is disabled in development mode. You can use the app without signing in.')
+      return
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -55,6 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    // Don't allow sign out on localhost
+    if (isClient && isLocalhost()) {
+      return
+    }
+
     const { error } = await supabase.auth.signOut()
     if (error) {
       console.error('Error signing out:', error.message)

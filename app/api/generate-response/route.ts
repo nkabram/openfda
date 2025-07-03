@@ -71,10 +71,23 @@ export async function POST(request: NextRequest) {
       fdaData = await searchMedicationInOpenFDA(medication)
     }
 
-    // Prepare context for AI response
+    // Prepare context for AI response - truncate to avoid token limits
     let context = ''
     if (fdaData && fdaData.results && fdaData.results.length > 0) {
       const result = fdaData.results[0]
+      
+      // Helper function to truncate text to avoid token limits
+      const truncateText = (text: string, maxLength: number = 500) => {
+        if (text.length <= maxLength) return text
+        return text.substring(0, maxLength) + '...'
+      }
+      
+      const joinAndTruncate = (arr: string[] | undefined, maxLength: number = 300) => {
+        if (!arr || arr.length === 0) return 'Not specified'
+        const joined = arr.join(' ')
+        return truncateText(joined, maxLength)
+      }
+      
       context = `
 FDA Drug Information for ${medication}:
 
@@ -82,12 +95,12 @@ Brand Names: ${result.openfda?.brand_name?.join(', ') || 'Not specified'}
 Generic Names: ${result.openfda?.generic_name?.join(', ') || 'Not specified'}
 Manufacturer: ${result.openfda?.manufacturer_name?.join(', ') || 'Not specified'}
 
-Indications and Usage: ${result.indications_and_usage?.join(' ') || 'Not specified'}
-Dosage and Administration: ${result.dosage_and_administration?.join(' ') || 'Not specified'}
-Warnings: ${result.warnings?.join(' ') || 'Not specified'}
-Contraindications: ${result.contraindications?.join(' ') || 'Not specified'}
-Adverse Reactions: ${result.adverse_reactions?.join(' ') || 'Not specified'}
-Drug Interactions: ${result.drug_interactions?.join(' ') || 'Not specified'}
+Indications and Usage: ${joinAndTruncate(result.indications_and_usage, 400)}
+Dosage and Administration: ${joinAndTruncate(result.dosage_and_administration, 300)}
+Warnings: ${joinAndTruncate(result.warnings, 400)}
+Contraindications: ${joinAndTruncate(result.contraindications, 200)}
+Adverse Reactions: ${joinAndTruncate(result.adverse_reactions, 300)}
+Drug Interactions: ${joinAndTruncate(result.drug_interactions, 300)}
       `.trim()
     }
 
@@ -101,14 +114,14 @@ Drug Interactions: ${result.drug_interactions?.join(' ') || 'Not specified'}
 Guidelines:
 1. Always prioritize FDA-approved information when available
 2. Be clear about the source of your information
-3. Include appropriate medical disclaimers
-4. If no FDA data is available, provide general medical knowledge but clearly state the limitation
-5. Encourage users to consult healthcare providers for personalized advice
-6. Be concise but comprehensive
-7. Use clear, accessible language
+3. If no FDA data is available, decline to provide an answer. 
+4. Be concise but comprehensive
+5. Use clear, accessible language, for a medical professional audience, ie doctors, pharmacists, physician assistants, nurse practitioners, and nurses
 
-Important: Always include this disclaimer at the end of your response:
-"⚠️ This information is for educational purposes only and should not replace professional medical advice. Always consult with a healthcare provider before making any changes to your medication regimen."`
+RESPONSE FORMAT:
+Start your response with "**Bottom Line:** [One sentence summary that directly answers the user's question]"
+
+Then provide the detailed explanation below.`
         },
         {
           role: 'user',
@@ -119,7 +132,7 @@ ${context ? `FDA Data Available:\n${context}` : 'No specific FDA data available 
 Please provide a helpful response to the user's question.`
         }
       ],
-      temperature: 0.3,
+      temperature: 0.1,
       max_tokens: 1000,
     })
 

@@ -1,35 +1,72 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MedicationQueryForm } from '../components/medication-query-form'
 import { QueryHistory } from '../components/query-history'
 import { AuthWrapper } from '../components/auth/AuthWrapper'
 import { AuthGuard } from '../components/auth/AuthGuard'
+import { DisclaimerModal } from '../components/disclaimer-modal'
 import { Button } from '../components/ui/button'
-import { Menu, X } from 'lucide-react'
+import { PanelLeft, PanelLeftOpen, Plus } from 'lucide-react'
 
 export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [queryRefreshTrigger, setQueryRefreshTrigger] = useState(0)
+  const [selectedQuery, setSelectedQuery] = useState<any>(null)
+  const [newQueryTrigger, setNewQueryTrigger] = useState(0)
+
+  // Load sidebar state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('sidebarOpen')
+    if (savedState !== null) {
+      setIsSidebarOpen(JSON.parse(savedState))
+    }
+  }, [])
+
+  // Save sidebar state to localStorage when it changes
+  const toggleSidebar = (open: boolean) => {
+    setIsSidebarOpen(open)
+    localStorage.setItem('sidebarOpen', JSON.stringify(open))
+  }
+
+  const handleQuerySaved = () => {
+    // Trigger a refresh of the query history
+    setQueryRefreshTrigger(prev => prev + 1)
+  }
+
+  const handleNewQuery = () => {
+    setSelectedQuery(null)
+    setNewQueryTrigger(prev => prev + 1)
+  }
+
+  const handleQuerySelected = (query: any) => {
+    setSelectedQuery(query)
+  }
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background relative">
         <div className="flex">
           {/* Sidebar */}
-          <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden border-r border-border`}>
+          <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 ease-in-out overflow-hidden border-r border-border ${isSidebarOpen ? 'shadow-sm' : ''}`}>
             <div className="h-full">
               <div className="p-4 border-b border-border flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Query History</h2>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="lg:hidden"
+                  onClick={() => toggleSidebar(false)}
+                  title="Collapse sidebar"
+                  className="hover:bg-muted transition-colors"
                 >
-                  <X className="h-4 w-4" />
+                  <PanelLeft className="h-4 w-4" />
                 </Button>
               </div>
-              <QueryHistory />
+              <QueryHistory 
+                refreshTrigger={queryRefreshTrigger} 
+                onQuerySelected={handleQuerySelected}
+                selectedQueryId={selectedQuery?.id}
+              />
             </div>
           </div>
 
@@ -41,20 +78,47 @@ export default function Home() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setIsSidebarOpen(true)}
+                    onClick={() => toggleSidebar(true)}
+                    title="Expand sidebar"
+                    className="hover:bg-muted transition-colors"
                   >
-                    <Menu className="h-4 w-4" />
+                    <PanelLeftOpen className="h-4 w-4" />
                   </Button>
                 )}
-                <h1 className="text-xl font-bold">OpenFDA Medication QA</h1>
+                <h1 
+                  className="text-xl font-bold cursor-pointer hover:text-primary transition-colors" 
+                  onClick={handleNewQuery}
+                  title="Click to start a new query"
+                >
+                  OpenFDA Medication QA
+                </h1>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNewQuery}
+                  className="hover:bg-muted transition-colors ml-3"
+                  title="New Query"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Query
+                </Button>
               </div>
               <AuthWrapper />
             </div>
             
             <div className="p-6">
-              <MedicationQueryForm />
+              <MedicationQueryForm 
+                onQuerySaved={handleQuerySaved}
+                selectedQuery={selectedQuery}
+                newQueryTrigger={newQueryTrigger}
+              />
             </div>
           </div>
+        </div>
+        
+        {/* Fixed Disclaimer in bottom right */}
+        <div className="fixed bottom-4 right-4 z-50">
+          <DisclaimerModal />
         </div>
       </div>
     </AuthGuard>
