@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4.1-nano",
       messages: [
         {
           role: "user",
@@ -411,7 +411,7 @@ Please consult with a healthcare professional or pharmacist for accurate informa
 
     // Step 3: Generate AI response
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4.1-nano",
       messages: [
         {
           role: "user",

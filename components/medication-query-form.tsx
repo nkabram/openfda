@@ -76,7 +76,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
 
   // Effect to handle new query trigger
   useEffect(() => {
-    if (newQueryTrigger > 0) {
+    if (newQueryTrigger && newQueryTrigger > 0) {
       handleNewQuery()
     }
   }, [newQueryTrigger])
@@ -498,12 +498,11 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                         </div>
                       </div>
                     )}
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm]}
-                      className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-blockquote:text-muted-foreground prose-code:text-foreground prose-pre:bg-muted prose-pre:text-foreground"
-                    >
-                      {restOfText}
-                    </ReactMarkdown>
+                    <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-blockquote:text-muted-foreground prose-code:text-foreground prose-pre:bg-muted prose-pre:text-foreground">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {restOfText}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 )
               })()}
