@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Send, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, Send, ChevronDown, ChevronUp, Globe, Search, Eye, EyeOff } from 'lucide-react'
+import * as Collapsible from '@radix-ui/react-collapsible'
 import { useToast } from '@/hooks/use-toast'
 import { ProgressIndicator, ProgressStep } from '@/components/ui/progress-indicator'
 import { useAuth } from '@/contexts/AuthContext'
@@ -26,6 +27,14 @@ interface FollowUpMessage {
   type: 'question' | 'answer'
   content: string
   timestamp: Date
+  citations?: Array<{
+    title: string
+    url: string
+    snippet: string
+    display_url: string
+    position: number
+  }>
+  websearchUsed?: boolean
 }
 
 interface MedicationQueryFormProps {
@@ -43,6 +52,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false)
   const [followUpMessages, setFollowUpMessages] = useState<FollowUpMessage[]>([])
   const [currentQueryId, setCurrentQueryId] = useState<string | null>(null)
+  const [websearchEnabled, setWebsearchEnabled] = useState(false)
+  const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
+  const [followUpDetailStates, setFollowUpDetailStates] = useState<{[key: string]: boolean}>({})
   const followUpRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
   const { session } = useAuth()
@@ -286,7 +298,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     setIsFollowUpLoading(true)
 
     try {
-      const response = await fetch('/api/follow-up', {
+      const response = await fetch(websearchEnabled ? '/api/follow-up-websearch' : '/api/follow-up', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -295,26 +307,30 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error('Failed to get follow-up response')
+        throw new Error(data.error || 'Failed to get follow-up response')
       }
 
-      const { response: followUpResponse } = await response.json()
+      const followUpResponse = data.response
 
-      // Add both question and answer to the conversation
+      // Add both question and answer to messages
       setFollowUpMessages(prev => [
         ...prev,
         {
-          id: Date.now().toString(),
+          id: `question-${Date.now()}`,
           type: 'question',
           content: followUpQuestion.trim(),
           timestamp: new Date(),
         },
         {
-          id: (Date.now() + 1).toString(),
+          id: `answer-${Date.now()}`,
           type: 'answer',
           content: followUpResponse,
           timestamp: new Date(),
+          websearchUsed: data.websearchUsed || websearchEnabled,
+          citations: data.citations || [],
         },
       ])
 
@@ -469,157 +485,261 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
 
       {/* Response Section */}
       {response && (
-        <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-lg">📋 Response</span>
-              {response.medication && (
-                <span className="text-sm font-normal text-muted-foreground bg-muted px-2 py-1 rounded">
-                  Medication: {response.medication}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="text-lg font-semibold">📋 Response</span>
+            {response.medication && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">for</span>
+                <span className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium shadow-sm">
+                  {response.medication}
                 </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              {(() => {
-                const { bottomLine, restOfText } = parseBottomLine(response.response)
-                return (
-                  <div>
-                    {bottomLine && (
-                      <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg dark:bg-blue-950/50 dark:border-blue-400">
-                        <div className="flex items-start gap-2">
-                          <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                            TL;DR
-                          </div>
-                          <div className="font-medium text-blue-900 dark:text-blue-100">
-                            {bottomLine}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-blockquote:text-muted-foreground prose-code:text-foreground prose-pre:bg-muted prose-pre:text-foreground">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {restOfText}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-            
-            {response.fdaData && response.fdaData.results && (
-              <div className="mt-6 p-4 bg-muted rounded-lg">
-                <h4 className="font-semibold mb-2">FDA Data Source</h4>
-                <p className="text-sm text-muted-foreground">
-                  This response includes official FDA drug labeling information.
-                </p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+          
+          {(() => {
+            const { bottomLine, restOfText } = parseBottomLine(response.response)
+            return (
+              <div className="space-y-4">
+                {/* Bottom Line - Always Visible */}
+                {bottomLine && (
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-800/50">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                        SUMMARY
+                      </div>
+                      <div className="font-semibold text-blue-900 dark:text-blue-100 text-base leading-relaxed">
+                        {bottomLine}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Collapsible Detailed Explanation */}
+                <Collapsible.Root open={isDetailedExplanationOpen} onOpenChange={setIsDetailedExplanationOpen}>
+                  <Collapsible.Trigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-between p-3 h-auto bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 text-sm">
+                        {isDetailedExplanationOpen ? (
+                          <>
+                            <EyeOff className="h-3 w-3" />
+                            <span className="font-medium">Hide Details</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3 w-3" />
+                            <span className="font-medium">Show Detailed Explanation</span>
+                          </>
+                        )}
+                      </div>
+                      {isDetailedExplanationOpen ? (
+                        <ChevronUp className="h-3 w-3 text-slate-500" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3 text-slate-500" />
+                      )}
+                    </Button>
+                  </Collapsible.Trigger>
+                  
+                  <Collapsible.Content className="data-[state=open]:animate-slideDown data-[state=closed]:animate-slideUp overflow-hidden">
+                    <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner mt-2">
+                      <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-slate-800 dark:prose-headings:text-slate-200 prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-bold prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {restOfText}
+                        </ReactMarkdown>
+                      </div>
+                      
+                      {/* FDA Data Source Info - Moved inside details */}
+                      {response.fdaData && response.fdaData.results && (
+                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600">
+                          <div className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+                            <div className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-blue-700 dark:text-blue-300 font-medium">
+                              FDA SOURCE
+                            </div>
+                            <div className="flex-1">
+                              <p className="mb-1">
+                                This response includes official FDA drug labeling information from the FDA's National Drug Code Directory and drug labeling database.
+                              </p>
+                              <a 
+                                href={`https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=${encodeURIComponent(response.medication || '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline font-medium"
+                              >
+                                View official FDA labeling on DailyMed →
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Collapsible.Content>
+                </Collapsible.Root>
+              </div>
+            )
+          })()}
+      </div>
       )}
 
       {/* Follow-up Messages */}
       {followUpMessages.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <div className="flex-1 border-t"></div>
-            <span>💬 Follow-up Conversation</span>
-            <div className="flex-1 border-t"></div>
-          </div>
+        <div className="space-y-6">
           {followUpMessages.map((message) => (
-            <Card key={message.id} className={`${message.type === 'question' ? 'ml-8 border-blue-200 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-900/10' : 'mr-8 border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-900/10'}`}>
-              <CardContent className="pt-4">
-                {message.type === 'question' ? (
-                  <div>
-                    <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-2">
-                      <span>❓</span>
-                      Follow-up Question:
-                    </div>
-                    <div className="text-sm pl-6">{message.content}</div>
+            <div key={message.id} className="space-y-3">
+              {message.type === 'question' && (
+                <div className="flex items-start gap-3">
+                  <span className="text-lg">❓</span>
+                  <div className="flex-1">
+                    <p className="text-foreground font-medium">{message.content}</p>
                   </div>
-                ) : (
-                  <div>
-                    <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-2 flex items-center gap-2">
-                      <span>💡</span>
-                      Follow-up Answer:
-                    </div>
-                    <div className="prose prose-sm max-w-none dark:prose-invert pl-6">
-                      {(() => {
-                        const { bottomLine, restOfText } = parseBottomLine(message.content)
-                        return (
-                          <div>
-                            {bottomLine && (
-                              <div className="mb-3 p-3 bg-green-50 border-l-4 border-green-500 rounded-r-lg dark:bg-green-950/50 dark:border-green-400">
-                                <div className="flex items-start gap-2">
-                                  <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                    TL;DR
+                </div>
+              )}
+              
+              {message.type === 'answer' && (
+                <div className="flex items-start gap-3">
+                  <span className="text-lg">💡</span>
+                  <div className="flex-1 space-y-3">
+                    {(() => {
+                      const { bottomLine, restOfText } = parseBottomLine(message.content)
+                      return (
+                        <div>
+                          {/* Always visible summary */}
+                          {bottomLine && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                              <p className="text-blue-900 dark:text-blue-100 font-medium">
+                                <strong>Bottom Line:</strong> {bottomLine}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Collapsible detailed explanation */}
+                          {restOfText && (
+                            <Collapsible.Root 
+                              open={followUpDetailStates[message.id] || false}
+                              onOpenChange={(open) => 
+                                setFollowUpDetailStates(prev => ({ ...prev, [message.id]: open }))
+                              }
+                            >
+                              <Collapsible.Trigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground p-0 h-auto font-normal"
+                                >
+                                  {followUpDetailStates[message.id] ? (
+                                    <>
+                                      <EyeOff className="h-4 w-4" />
+                                      <ChevronUp className="h-4 w-4" />
+                                      Hide Details
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye className="h-4 w-4" />
+                                      <ChevronDown className="h-4 w-4" />
+                                      Show Details
+                                    </>
+                                  )}
+                                </Button>
+                              </Collapsible.Trigger>
+                              
+                              <Collapsible.Content className="data-[state=open]:animate-slideDown data-[state=closed]:animate-slideUp overflow-hidden">
+                                <div className="p-3 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-lg shadow-inner mt-2">
+                                  <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-slate-800 dark:prose-headings:text-slate-200 prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-bold prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                      {restOfText}
+                                    </ReactMarkdown>
                                   </div>
-                                  <div className="font-medium text-green-900 dark:text-green-100 text-sm">
-                                    {bottomLine}
-                                  </div>
+                                  
+                                  {/* Citations for follow-up answers */}
+                                  {message.citations && message.citations.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600">
+                                      <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Sources:</h4>
+                                      <ol className="space-y-1">
+                                        {message.citations.map((citation: any, index: number) => (
+                                          <li key={index} className="text-sm">
+                                            <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium mr-2">
+                                              {index + 1}
+                                            </span>
+                                            <a 
+                                              href={citation.url} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium underline decoration-blue-300 dark:decoration-blue-600 underline-offset-2"
+                                            >
+                                              {citation.title}
+                                            </a>
+                                          </li>
+                                        ))}
+                                      </ol>
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            )}
-                            <div className="whitespace-pre-wrap text-sm">{restOfText}</div>
-                          </div>
-                        )
-                      })()}
-                    </div>
+                              </Collapsible.Content>
+                            </Collapsible.Root>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
 
-      {/* Follow-up Input */}
+      {/* Follow-up Input - Simplified Chat Style */}
       {response && currentQueryId && (
-        <Card className="border-purple-200 bg-purple-50/30 dark:border-purple-800 dark:bg-purple-900/10">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <span>💭</span>
-              Follow-up Question
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleFollowUpSubmit} className="space-y-4">
-              <div>
-                <Textarea
-                  ref={followUpRef}
-                  placeholder="Ask a follow-up question about this medication..."
-                  value={followUpQuestion}
-                  onChange={(e) => setFollowUpQuestion(e.target.value)}
-                  onKeyDown={handleFollowUpKeyDown}
-                  className="min-h-[60px] resize-none bg-background"
-                  disabled={isFollowUpLoading}
-                />
-                <p className="text-sm text-muted-foreground mt-2">
-                  Press Ctrl+Enter to submit
-                </p>
-              </div>
-              <Button 
-                type="submit" 
-                disabled={isFollowUpLoading || !followUpQuestion.trim()}
-                size="sm"
-              >
-                {isFollowUpLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Ask Follow-up
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setWebsearchEnabled(!websearchEnabled)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {websearchEnabled ? (
+                <>
+                  <Globe className="mr-2 h-4 w-4" />
+                  Web Search: On
+                </>
+              ) : (
+                <>
+                  <Search className="mr-2 h-4 w-4" />
+                  Web Search: Off
+                </>
+              )}
+            </Button>
+          </div>
+          
+          <form onSubmit={handleFollowUpSubmit} className="relative">
+            <Textarea
+              ref={followUpRef}
+              placeholder="Ask a follow-up question..."
+              value={followUpQuestion}
+              onChange={(e) => setFollowUpQuestion(e.target.value)}
+              onKeyDown={handleFollowUpKeyDown}
+              className="min-h-[60px] resize-none bg-background pr-12"
+              disabled={isFollowUpLoading}
+            />
+            <Button 
+              type="submit" 
+              size="sm"
+              disabled={!followUpQuestion.trim() || isFollowUpLoading}
+              className="absolute right-2 bottom-2 h-8 w-8 p-0"
+            >
+              {isFollowUpLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </form>
+        </div>
       )}
     </div>
   )
