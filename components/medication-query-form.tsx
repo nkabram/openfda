@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Send, ChevronDown, ChevronUp, Globe, Search, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Send, ChevronDown, ChevronUp, Globe } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import { useToast } from '@/hooks/use-toast'
 import { ProgressIndicator, ProgressStep } from '@/components/ui/progress-indicator'
@@ -52,7 +52,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false)
   const [followUpMessages, setFollowUpMessages] = useState<FollowUpMessage[]>([])
   const [currentQueryId, setCurrentQueryId] = useState<string | null>(null)
-  const [websearchEnabled, setWebsearchEnabled] = useState(false)
+  const [websearchEnabled, setWebsearchEnabled] = useState(true)
   const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
   const [followUpDetailStates, setFollowUpDetailStates] = useState<{[key: string]: boolean}>({})
   const followUpRef = useRef<HTMLTextAreaElement>(null)
@@ -359,7 +359,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   }
 
   const handleFollowUpKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleFollowUpSubmit(e as any)
     }
@@ -487,13 +487,10 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       {response && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <span className="text-lg font-semibold">📋 Response</span>
+            <span className="text-lg font-semibold">Response</span>
             {response.medication && (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">for</span>
-                <span className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium shadow-sm">
-                  {response.medication}
-                </span>
+                <span className="text-sm text-muted-foreground">for {response.medication}</span>
               </div>
             )}
           </div>
@@ -505,13 +502,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                 {/* Bottom Line - Always Visible */}
                 {bottomLine && (
                   <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-800/50">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                        SUMMARY
-                      </div>
-                      <div className="font-semibold text-blue-900 dark:text-blue-100 text-base leading-relaxed">
-                        {bottomLine}
-                      </div>
+                    <div className="font-semibold text-blue-900 dark:text-blue-100 text-base leading-relaxed">
+                      {bottomLine}
                     </div>
                   </div>
                 )}
@@ -521,26 +513,16 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                   <Collapsible.Trigger asChild>
                     <Button 
                       variant="ghost" 
-                      className="w-full justify-between p-3 h-auto bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg transition-all duration-200"
+                      className="w-full justify-center p-2 h-auto hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all duration-200"
                     >
-                      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 text-sm">
+                      <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 text-xs">
+                        <span className="font-medium">Show detailed explanation</span>
                         {isDetailedExplanationOpen ? (
-                          <>
-                            <EyeOff className="h-3 w-3" />
-                            <span className="font-medium">Hide Details</span>
-                          </>
+                          <ChevronUp className="h-3 w-3" />
                         ) : (
-                          <>
-                            <Eye className="h-3 w-3" />
-                            <span className="font-medium">Show Detailed Explanation</span>
-                          </>
+                          <ChevronDown className="h-3 w-3" />
                         )}
                       </div>
-                      {isDetailedExplanationOpen ? (
-                        <ChevronUp className="h-3 w-3 text-slate-500" />
-                      ) : (
-                        <ChevronDown className="h-3 w-3 text-slate-500" />
-                      )}
                     </Button>
                   </Collapsible.Trigger>
                   
@@ -591,7 +573,6 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
             <div key={message.id} className="space-y-3">
               {message.type === 'question' && (
                 <div className="flex items-start gap-3">
-                  <span className="text-lg">❓</span>
                   <div className="flex-1">
                     <p className="text-foreground font-medium">{message.content}</p>
                   </div>
@@ -600,7 +581,6 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
               
               {message.type === 'answer' && (
                 <div className="flex items-start gap-3">
-                  <span className="text-lg">💡</span>
                   <div className="flex-1 space-y-3">
                     {(() => {
                       const { bottomLine, restOfText } = parseBottomLine(message.content)
@@ -631,13 +611,11 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                                 >
                                   {followUpDetailStates[message.id] ? (
                                     <>
-                                      <EyeOff className="h-4 w-4" />
                                       <ChevronUp className="h-4 w-4" />
                                       Hide Details
                                     </>
                                   ) : (
                                     <>
-                                      <Eye className="h-4 w-4" />
                                       <ChevronDown className="h-4 w-4" />
                                       Show Details
                                     </>
@@ -694,28 +672,6 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       {/* Follow-up Input - Simplified Chat Style */}
       {response && currentQueryId && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setWebsearchEnabled(!websearchEnabled)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              {websearchEnabled ? (
-                <>
-                  <Globe className="mr-2 h-4 w-4" />
-                  Web Search: On
-                </>
-              ) : (
-                <>
-                  <Search className="mr-2 h-4 w-4" />
-                  Web Search: Off
-                </>
-              )}
-            </Button>
-          </div>
-          
           <form onSubmit={handleFollowUpSubmit} className="relative">
             <Textarea
               ref={followUpRef}
@@ -723,21 +679,36 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
               value={followUpQuestion}
               onChange={(e) => setFollowUpQuestion(e.target.value)}
               onKeyDown={handleFollowUpKeyDown}
-              className="min-h-[60px] resize-none bg-background pr-12"
+              className="min-h-[60px] resize-none bg-background pr-20"
               disabled={isFollowUpLoading}
             />
-            <Button 
-              type="submit" 
-              size="sm"
-              disabled={!followUpQuestion.trim() || isFollowUpLoading}
-              className="absolute right-2 bottom-2 h-8 w-8 p-0"
-            >
-              {isFollowUpLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
+            <div className="absolute right-2 bottom-2 flex items-center gap-1">
+              <Button 
+                type="button" 
+                size="sm"
+                onClick={() => setWebsearchEnabled(!websearchEnabled)}
+                className={`h-8 w-8 p-0 ${
+                  websearchEnabled 
+                    ? 'bg-blue-100 hover:bg-blue-200 text-blue-600 dark:bg-blue-900/50 dark:hover:bg-blue-800/50 dark:text-blue-400' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-400'
+                }`}
+                title={websearchEnabled ? 'Web search enabled' : 'Web search disabled'}
+              >
+                <Globe className="h-4 w-4" />
+              </Button>
+              <Button 
+                type="submit" 
+                size="sm"
+                disabled={!followUpQuestion.trim() || isFollowUpLoading}
+                className="h-8 w-8 p-0"
+              >
+                {isFollowUpLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </form>
         </div>
       )}
