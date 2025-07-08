@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Send, ChevronDown, ChevronUp, Globe } from 'lucide-react'
+import { Loader2, Send, ChevronDown, ChevronUp, Globe, Pill } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import { useToast } from '@/hooks/use-toast'
 import { ProgressIndicator, ProgressStep } from '@/components/ui/progress-indicator'
@@ -52,9 +52,17 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false)
   const [followUpMessages, setFollowUpMessages] = useState<FollowUpMessage[]>([])
   const [currentQueryId, setCurrentQueryId] = useState<string | null>(null)
-  const [websearchEnabled, setWebsearchEnabled] = useState(true)
+  const [websearchEnabled, setWebsearchEnabled] = useState(false)
+  const [fdaDocsEnabled, setFdaDocsEnabled] = useState(true)
+  const [followUpMode, setFollowUpMode] = useState<'fda_docs' | 'websearch' | 'llm_only'>('fda_docs')
   const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
   const [followUpDetailStates, setFollowUpDetailStates] = useState<{[key: string]: boolean}>({})
+  const [needsMoreInfoPrompt, setNeedsMoreInfoPrompt] = useState<{
+    show: boolean
+    searchedSections: string[]
+    medication: string
+    originalQuestion: string
+  } | null>(null)
   const followUpRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
   const { session } = useAuth()
@@ -167,6 +175,33 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     ])
   }
 
+  // Mode switching functions
+  const handleFdaDocsToggle = () => {
+    if (!fdaDocsEnabled) {
+      setFdaDocsEnabled(true)
+      setWebsearchEnabled(false)
+      setFollowUpMode('fda_docs')
+    } else {
+      setFdaDocsEnabled(false)
+      if (!websearchEnabled) {
+        setFollowUpMode('llm_only')
+      }
+    }
+  }
+
+  const handleWebsearchToggle = () => {
+    if (!websearchEnabled) {
+      setWebsearchEnabled(true)
+      setFdaDocsEnabled(false)
+      setFollowUpMode('websearch')
+    } else {
+      setWebsearchEnabled(false)
+      if (!fdaDocsEnabled) {
+        setFollowUpMode('llm_only')
+      }
+    }
+  }
+
   const parseBottomLine = (text: string) => {
     const bottomLineMatch = text.match(/\*\*Bottom Line:\*\*\s*([^*\n]+)/i)
     if (bottomLineMatch) {
@@ -226,7 +261,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
           query, 
           medication, 
           intents, 
-          fdaSections 
+          fdaSections,
+          saveToDatabase: true
         }),
       })
 
@@ -242,32 +278,25 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       setResponse(responseData)
       updateStepStatus('respond', 'completed')
 
-      // Step 3: Save query to database
-      try {
-        const saveResponse = await fetch('/api/queries', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            userQuery: query,
-            extractedMedication: medication,
-            detectedIntents: intents,
-            fdaSections: fdaSections,
-            openfdaResponse: responseData.fdaData,
-            aiResponse: responseData.response,
-          }),
-        })
-
-        if (saveResponse.ok) {
-          const savedQuery = await saveResponse.json()
-          setCurrentQueryId(savedQuery.query.id)
-          
-          // Notify parent component to update query history
-          if (onQuerySaved) {
-            onQuerySaved(savedQuery.query)
+      // Set the query ID from the response (saved by generate-response API)
+      if (responseData.queryId) {
+        setCurrentQueryId(responseData.queryId)
+        
+        // Notify parent component to update query history if needed
+        if (onQuerySaved) {
+          // Create a query object for the parent component
+          const queryForParent = {
+            id: responseData.queryId,
+            user_query: query,
+            medication_name: responseData.medication,
+            detected_intents: responseData.intents,
+            fda_sections: responseData.fdaSections,
+            fda_response: responseData.fdaData,
+            ai_response: responseData.response,
+            created_at: new Date().toISOString()
           }
+          onQuerySaved(queryForParent)
         }
-      } catch (saveError) {
-        console.error('Failed to save query:', saveError)
       }
 
       // Collapse the form after successful submission
@@ -298,13 +327,27 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     setIsFollowUpLoading(true)
 
     try {
-      const response = await fetch(websearchEnabled ? '/api/follow-up-websearch' : '/api/follow-up', {
+      let apiEndpoint = '/api/follow-up'
+      let requestBody: any = {
+        queryId: currentQueryId,
+        followUpQuestion: followUpQuestion.trim(),
+      }
+
+      // Choose API endpoint based on follow-up mode
+      if (followUpMode === 'websearch') {
+        apiEndpoint = '/api/follow-up-websearch'
+      } else if (followUpMode === 'fda_docs') {
+        apiEndpoint = '/api/follow-up-fda'
+        requestBody.mode = 'fda_docs'
+      } else if (followUpMode === 'llm_only') {
+        apiEndpoint = '/api/follow-up-fda'
+        requestBody.mode = 'llm_only'
+      }
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          queryId: currentQueryId,
-          followUpQuestion: followUpQuestion.trim(),
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()
@@ -314,6 +357,19 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       }
 
       const followUpResponse = data.response
+
+      // Check if more info is needed and show prompt
+      if (data.needsMoreInfo && followUpMode === 'fda_docs') {
+        setNeedsMoreInfoPrompt({
+          show: true,
+          searchedSections: data.searchedSections || [],
+          medication: data.medication || 'the medication',
+          originalQuestion: followUpQuestion.trim()
+        })
+      } else {
+        // Clear any existing prompt
+        setNeedsMoreInfoPrompt(null)
+      }
 
       // Add both question and answer to messages
       setFollowUpMessages(prev => [
@@ -329,7 +385,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
           type: 'answer',
           content: followUpResponse,
           timestamp: new Date(),
-          websearchUsed: data.websearchUsed || websearchEnabled,
+          websearchUsed: data.websearchUsed || followUpMode === 'websearch',
           citations: data.citations || [],
         },
       ])
@@ -338,6 +394,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       
       toast({
         title: "Follow-up response generated",
+        description: followUpMode === 'fda_docs' ? 'Using saved FDA documentation' : 
+                    followUpMode === 'websearch' ? 'Using web search' : 
+                    'Using general knowledge'
       })
     } catch (error) {
       console.error('Error processing follow-up:', error)
@@ -372,7 +431,49 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     setFollowUpMessages([])
     setCurrentQueryId(null)
     setFollowUpQuestion('')
+    setNeedsMoreInfoPrompt(null)
     resetProgress()
+  }
+
+  const handleNewFDASearch = async () => {
+    if (!needsMoreInfoPrompt) return
+    
+    // Dismiss the prompt
+    setNeedsMoreInfoPrompt(null)
+    
+    // Set the query to the original question and trigger a new search
+    setQuery(needsMoreInfoPrompt.originalQuestion)
+    setResponse(null)
+    setIsCollapsed(false)
+    setFollowUpMessages([])
+    setCurrentQueryId(null)
+    setFollowUpQuestion('')
+    
+    // Auto-submit the query
+    setTimeout(() => {
+      const form = document.querySelector('form')
+      if (form) {
+        form.requestSubmit()
+      }
+    }, 100)
+  }
+
+  const handleNewWebSearch = () => {
+    if (!needsMoreInfoPrompt) return
+    
+    // Dismiss the prompt and switch to web search mode
+    setNeedsMoreInfoPrompt(null)
+    setFollowUpMode('websearch')
+    setFollowUpQuestion(needsMoreInfoPrompt.originalQuestion)
+    
+    // Focus the follow-up input
+    setTimeout(() => {
+      followUpRef.current?.focus()
+    }, 100)
+  }
+
+  const dismissMoreInfoPrompt = () => {
+    setNeedsMoreInfoPrompt(null)
   }
 
   return (
@@ -528,8 +629,31 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                   
                   <Collapsible.Content className="data-[state=open]:animate-slideDown data-[state=closed]:animate-slideUp overflow-hidden">
                     <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner mt-2">
-                      <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-slate-800 dark:prose-headings:text-slate-200 prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-bold prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      <div className="prose prose-sm max-w-none dark:prose-invert
+                        prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-headings:font-semibold prose-headings:mb-3 prose-headings:mt-4 first:prose-headings:mt-0
+                        prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4
+                        prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
+                        prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ul:mb-4 prose-ul:space-y-1
+                        prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-ol:mb-4 prose-ol:space-y-1
+                        prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-li:leading-relaxed
+                        prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-blockquote:bg-slate-100/50 dark:prose-blockquote:bg-slate-800/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded
+                        prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
+                        prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
+                        prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium prose-a:no-underline hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300 hover:prose-a:underline
+                        prose-hr:border-slate-300 dark:prose-hr:border-slate-600 prose-hr:my-6
+                        [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                            h1: ({ children }) => <h1 className="text-lg font-semibold mb-3 mt-6 first:mt-0">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-base font-semibold mb-3 mt-5 first:mt-0">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-semibold mb-2 mt-4 first:mt-0">{children}</h3>,
+                            ul: ({ children }) => <ul className="mb-4 space-y-1 pl-4">{children}</ul>,
+                            ol: ({ children }) => <ol className="mb-4 space-y-1 pl-4">{children}</ol>,
+                            li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          }}
+                        >
                           {restOfText}
                         </ReactMarkdown>
                       </div>
@@ -590,7 +714,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                           {bottomLine && (
                             <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
                               <p className="text-blue-900 dark:text-blue-100 font-medium">
-                                <strong>Bottom Line:</strong> {bottomLine}
+                                {bottomLine}
                               </p>
                             </div>
                           )}
@@ -606,27 +730,46 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                               <Collapsible.Trigger asChild>
                                 <Button 
                                   variant="ghost" 
-                                  size="sm" 
-                                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground p-0 h-auto font-normal"
+                                  className="w-full justify-center p-2 h-auto hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all duration-200"
                                 >
-                                  {followUpDetailStates[message.id] ? (
-                                    <>
-                                      <ChevronUp className="h-4 w-4" />
-                                      Hide Details
-                                    </>
-                                  ) : (
-                                    <>
-                                      <ChevronDown className="h-4 w-4" />
-                                      Show Details
-                                    </>
-                                  )}
+                                  <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 text-xs">
+                                    <span className="font-medium">Show detailed explanation</span>
+                                    {followUpDetailStates[message.id] ? (
+                                      <ChevronUp className="h-3 w-3" />
+                                    ) : (
+                                      <ChevronDown className="h-3 w-3" />
+                                    )}
+                                  </div>
                                 </Button>
                               </Collapsible.Trigger>
                               
                               <Collapsible.Content className="data-[state=open]:animate-slideDown data-[state=closed]:animate-slideUp overflow-hidden">
-                                <div className="p-3 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-lg shadow-inner mt-2">
-                                  <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-slate-800 dark:prose-headings:text-slate-200 prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-bold prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner mt-2">
+                                  <div className="prose prose-sm max-w-none dark:prose-invert
+                                    prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-headings:font-semibold prose-headings:mb-3 prose-headings:mt-4 first:prose-headings:mt-0
+                                    prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4
+                                    prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
+                                    prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ul:mb-4 prose-ul:space-y-1
+                                    prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-ol:mb-4 prose-ol:space-y-1
+                                    prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-li:leading-relaxed
+                                    prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-blockquote:bg-slate-100/50 dark:prose-blockquote:bg-slate-800/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded
+                                    prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
+                                    prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
+                                    prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium prose-a:no-underline hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300 hover:prose-a:underline
+                                    prose-hr:border-slate-300 dark:prose-hr:border-slate-600 prose-hr:my-6
+                                    [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                                    <ReactMarkdown 
+                                      remarkPlugins={[remarkGfm]}
+                                      components={{
+                                        p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                                        h1: ({ children }) => <h1 className="text-lg font-semibold mb-3 mt-6 first:mt-0">{children}</h1>,
+                                        h2: ({ children }) => <h2 className="text-base font-semibold mb-3 mt-5 first:mt-0">{children}</h2>,
+                                        h3: ({ children }) => <h3 className="text-sm font-semibold mb-2 mt-4 first:mt-0">{children}</h3>,
+                                        ul: ({ children }) => <ul className="mb-4 space-y-1 pl-4">{children}</ul>,
+                                        ol: ({ children }) => <ol className="mb-4 space-y-1 pl-4">{children}</ol>,
+                                        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                                      }}
+                                    >
                                       {restOfText}
                                     </ReactMarkdown>
                                   </div>
@@ -669,6 +812,63 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
         </div>
       )}
 
+      {/* Need More Info Prompt */}
+      {needsMoreInfoPrompt?.show && (
+        <Card className="border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                <span className="text-slate-600 dark:text-slate-400 text-sm font-bold">!</span>
+              </div>
+              <div className="flex-1 space-y-3">
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">
+                    Information not found in saved FDA sections
+                  </h3>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 mb-2">
+                    I couldn't find information about "{needsMoreInfoPrompt.originalQuestion}" for {needsMoreInfoPrompt.medication} in the limited sections found in the previous search.
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                    I recommend doing one of the following actions:
+                  </p>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={handleNewFDASearch}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600"
+                  >
+                    <Pill className="h-4 w-4 mr-2" />
+                    New FDA Search
+                  </Button>
+                  <Button
+                    onClick={handleNewWebSearch}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600"
+                  >
+                    <Globe className="h-4 w-4 mr-2" />
+                    Web Search Instead
+                  </Button>
+                  <Button
+                    onClick={dismissMoreInfoPrompt}
+                    size="sm"
+                    variant="outline"
+                    className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    Continue Anyway
+                  </Button>
+                </div>
+                
+                <p className="text-xs text-slate-600 dark:text-slate-400 italic">
+                  💡 Tip: You can also just type a new follow-up question below to dismiss this prompt
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Follow-up Input - Simplified Chat Style */}
       {response && currentQueryId && (
         <div className="space-y-4">
@@ -677,24 +877,65 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
               ref={followUpRef}
               placeholder="Ask a follow-up question..."
               value={followUpQuestion}
-              onChange={(e) => setFollowUpQuestion(e.target.value)}
+              onChange={(e) => {
+                setFollowUpQuestion(e.target.value)
+                // Dismiss the more info prompt when user starts typing
+                if (needsMoreInfoPrompt?.show && e.target.value.trim()) {
+                  setNeedsMoreInfoPrompt(null)
+                }
+              }}
               onKeyDown={handleFollowUpKeyDown}
               className="min-h-[60px] resize-none bg-background pr-20"
               disabled={isFollowUpLoading}
             />
             <div className="absolute right-2 bottom-2 flex items-center gap-1">
+              {/* FDA Docs Toggle */}
               <Button 
                 type="button" 
                 size="sm"
-                onClick={() => setWebsearchEnabled(!websearchEnabled)}
+                onClick={handleFdaDocsToggle}
                 className={`h-8 w-8 p-0 ${
-                  websearchEnabled 
+                  followUpMode === 'fda_docs'
+                    ? 'bg-green-100 hover:bg-green-200 text-green-600 dark:bg-green-900/50 dark:hover:bg-green-800/50 dark:text-green-400' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-400'
+                }`}
+                title={followUpMode === 'fda_docs' ? 'Using FDA documentation' : 'Click to use FDA documentation'}
+              >
+                <Pill className="h-4 w-4" />
+              </Button>
+              
+              {/* Web Search Toggle */}
+              <Button 
+                type="button" 
+                size="sm"
+                onClick={handleWebsearchToggle}
+                className={`h-8 w-8 p-0 ${
+                  followUpMode === 'websearch'
                     ? 'bg-blue-100 hover:bg-blue-200 text-blue-600 dark:bg-blue-900/50 dark:hover:bg-blue-800/50 dark:text-blue-400' 
                     : 'bg-gray-100 hover:bg-gray-200 text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-400'
                 }`}
-                title={websearchEnabled ? 'Web search enabled' : 'Web search disabled'}
+                title={followUpMode === 'websearch' ? 'Using web search' : 'Click to use web search'}
               >
                 <Globe className="h-4 w-4" />
+              </Button>
+              
+              {/* LLM Only Toggle */}
+              <Button 
+                type="button" 
+                size="sm"
+                onClick={() => {
+                  setFdaDocsEnabled(false)
+                  setWebsearchEnabled(false)
+                  setFollowUpMode('llm_only')
+                }}
+                className={`h-8 w-8 p-0 ${
+                  followUpMode === 'llm_only'
+                    ? 'bg-purple-100 hover:bg-purple-200 text-purple-600 dark:bg-purple-900/50 dark:hover:bg-purple-800/50 dark:text-purple-400' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-400'
+                }`}
+                title={followUpMode === 'llm_only' ? 'Using general knowledge only' : 'Click to use general knowledge only'}
+              >
+                <span className="text-xs font-bold">AI</span>
               </Button>
               <Button 
                 type="submit" 

@@ -173,13 +173,11 @@ Please provide a helpful response to this follow-up question, taking into accoun
         }
       })
       
-      // Add citations list at the end of the response
-      if (citations.length > 0) {
-        formattedResponse += '\n\n---\n\n**Sources:**\n\n'
-        citations.forEach((citation, index) => {
-          formattedResponse += `${index + 1}. [${citation.title}](${citation.url})\n`
-        })
-      }
+      // Remove any sources section from the AI-generated response to avoid duplication
+      // since we display citations separately with blue formatting
+      formattedResponse = formattedResponse.replace(/\n\n---\n\n\*\*Sources?:\*\*[\s\S]*$/i, '')
+      formattedResponse = formattedResponse.replace(/\n\n\*\*References?:\*\*[\s\S]*$/i, '')
+      formattedResponse = formattedResponse.replace(/\n\n\*\*Citations?:\*\*[\s\S]*$/i, '')
     }
     
     const response = formattedResponse

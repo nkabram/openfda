@@ -1,9 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
+import { isLocalhost } from '@/lib/utils'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase environment variables')
+}
+
+const supabase = createClient(supabaseUrl!, supabaseKey!)
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
+
+// Helper function to get user from request
+async function getUserFromRequest(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) return null
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user } } = await supabase.auth.getUser(token)
+    return user
+  } catch (error) {
+    console.error('Error getting user:', error)
+    return null
+  }
+}
 
 interface OpenFDAResponse {
   results?: Array<{
@@ -152,7 +178,7 @@ function formatFDAContext(fdaData: any, medication: string, intents: string[]) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, medication, intents, fdaSections, openfdaData } = await request.json()
+    const { query, medication, intents, fdaSections, openfdaData, saveToDatabase = false } = await request.json()
 
     if (!query || typeof query !== 'string') {
       return NextResponse.json(
@@ -161,9 +187,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let userId = null
+    
+    // For localhost development, user_id can be null
+    if (!isLocalhost()) {
+      const user = await getUserFromRequest(request)
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        )
+      }
+      userId = user.id
+    }
+
     let fdaData = openfdaData
+    let rawFdaData = null
+    
     if (medication && !fdaData) {
-      const rawFdaData = await searchMedicationInOpenFDA(medication, 3)
+      rawFdaData = await searchMedicationInOpenFDA(medication, 3)
       if (rawFdaData && fdaSections && fdaSections.length > 0) {
         fdaData = extractRelevantSections(rawFdaData.results || [], fdaSections, intents || [])
       }
@@ -186,11 +228,12 @@ Guidelines:
 5. Use clear, accessible language for a medical professional audience (doctors, pharmacists, physician assistants, nurse practitioners, and nurses)
 6. When multiple products are available, mention the variations if relevant
 7. Focus your response on the specific intent of the user's question
+8. Do NOT include a "References:" section - source attribution is handled separately
 
 RESPONSE FORMAT:
 Start your response with "**Bottom Line:** [One sentence summary that directly answers the user's question]"
 
-Then provide the detailed explanation below, organized by relevant sections.`
+Then provide the detailed explanation below, organized by relevant sections. Do not include references or citations at the end.`
         },
         {
           role: 'user',
@@ -207,12 +250,43 @@ Please provide a helpful response to the user's question, focusing on the specif
 
     const response = completion.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response to your question.'
 
+    let queryId = null
+    
+    // Save to database if requested
+    if (saveToDatabase) {
+      try {
+        const { data: savedQuery, error: saveError } = await supabase
+          .from('fda_queries')
+          .insert({
+            user_id: userId,
+            user_query: query,
+            medication_name: medication,
+            fda_response: fdaData,
+            fda_raw_data: rawFdaData,
+            fda_sections_used: fdaSections || [],
+            detected_intents: intents || [],
+            ai_response: response
+          })
+          .select('id')
+          .single()
+
+        if (saveError) {
+          console.error('Error saving query:', saveError)
+        } else {
+          queryId = savedQuery.id
+        }
+      } catch (error) {
+        console.error('Error saving to database:', error)
+      }
+    }
+
     return NextResponse.json({
       response,
       medication,
       intents: intents || [],
       fdaSections: fdaSections || [],
-      fdaData: fdaData || null
+      fdaData: fdaData || null,
+      queryId
     })
   } catch (error) {
     console.error('Error generating response:', error)
