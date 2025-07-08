@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { SignInScreen } from './SignInScreen'
 import { Skeleton } from '@/components/ui/skeleton'
-import { isLocalhost } from '@/lib/utils'
+import { isLocalhost, shouldUseDevMode } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 
 interface AuthGuardProps {
@@ -17,7 +17,20 @@ export function AuthGuard({ children }: AuthGuardProps) {
   // Handle hydration by waiting for client-side render
   useEffect(() => {
     setIsClient(true)
-    setIsDevMode(isLocalhost())
+    setIsDevMode(shouldUseDevMode())
+    
+    // Listen for auth mode changes from localStorage
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'authMode') {
+        setIsDevMode(shouldUseDevMode())
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+    }
   }, [])
 
   // During SSR or initial client render, show loading
@@ -34,7 +47,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  // Skip authentication completely for localhost (after hydration)
+  // Skip authentication completely when in dev mode (after hydration)
   if (isDevMode) {
     return <>{children}</>
   }

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { isLocalhost } from '@/lib/utils'
+import { shouldUseDevMode } from '@/lib/utils'
 
 interface AuthContextType {
   user: User | null
@@ -23,14 +23,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setIsClient(true)
+    
+    // Listen for auth mode changes from localStorage
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'authMode') {
+        // Force a re-render by updating loading state
+        setLoading(true)
+        setTimeout(() => setLoading(false), 100)
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+    }
   }, [])
 
   useEffect(() => {
     // Wait for client-side hydration before checking localhost
     if (!isClient) return
 
-    // Skip authentication setup for localhost
-    if (isLocalhost()) {
+    // Skip authentication setup when in dev mode
+    if (shouldUseDevMode()) {
       setLoading(false)
       return
     }
@@ -58,8 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isClient])
 
   const signInWithGoogle = async () => {
-    // Don't allow sign in on localhost - show alert instead
-    if (isClient && isLocalhost()) {
+    // Don't allow sign in when in dev mode - show alert instead
+    if (isClient && shouldUseDevMode()) {
       alert('Authentication is disabled in development mode. You can use the app without signing in.')
       return
     }
@@ -76,8 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    // Don't allow sign out on localhost
-    if (isClient && isLocalhost()) {
+    // Don't allow sign out when in dev mode
+    if (isClient && shouldUseDevMode()) {
       return
     }
 

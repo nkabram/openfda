@@ -3,8 +3,9 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { LoginButton } from './LoginButton'
 import { UserProfile } from './UserProfile'
+import { AuthModeToggle } from './AuthModeToggle'
 import { Skeleton } from '@/components/ui/skeleton'
-import { isLocalhost } from '@/lib/utils'
+import { shouldUseDevMode, isLocalhost } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 
 export function AuthWrapper() {
@@ -14,7 +15,20 @@ export function AuthWrapper() {
   // Handle hydration by waiting for client-side render
   useEffect(() => {
     setIsClient(true)
-    setIsDevMode(isLocalhost())
+    setIsDevMode(shouldUseDevMode())
+    
+    // Listen for auth mode changes from localStorage
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'authMode') {
+        setIsDevMode(shouldUseDevMode())
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+    }
   }, [])
 
   // During SSR or initial client render, show loading
@@ -22,22 +36,23 @@ export function AuthWrapper() {
     return <Skeleton className="h-8 w-8 rounded-full" />
   }
 
-  // Show a development indicator on localhost (after hydration)
-  if (isDevMode) {
+  const { user, loading } = useAuth()
+
+  // Show loading skeleton during auth check
+  if (loading) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
-          🚧 Development Mode
-        </span>
+        {isLocalhost() && <AuthModeToggle />}
+        <Skeleton className="h-8 w-8 rounded-full" />
       </div>
     )
   }
 
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return <Skeleton className="h-8 w-8 rounded-full" />
-  }
-
-  return user ? <UserProfile /> : <LoginButton />
+  // Show auth toggle and appropriate auth component
+  return (
+    <div className="flex items-center gap-2">
+      {isLocalhost() && <AuthModeToggle />}
+      {isDevMode ? null : (user ? <UserProfile /> : <LoginButton />)}
+    </div>
+  )
 }
