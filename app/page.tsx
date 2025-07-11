@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useQueryCache } from '@/contexts/QueryCacheContext'
 import { ThemeToggle } from '@/components/theme-toggle'
 
-// Dynamically import AuthGuard to prevent hydration issues
+// Dynamically import AuthGuard to prevent hydration issues, not sure. 
 const AuthGuard = dynamic(() => import('../components/auth/AuthGuard').then(mod => ({ default: mod.AuthGuard })), {
   ssr: false,
   loading: () => (
