@@ -6,8 +6,8 @@ import { Providers } from './providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'OpenFDA Medication QA',
-  description: 'Ask questions about medications and get AI-powered responses using FDA data',
+  title: 'MedGuardRx - Enhancing Medication Safety',
+  description: 'MedGuardRx: Enhancing Medication Safety with Retrieval-Augmented Clinical QA',
 }
 
 export default function RootLayout({

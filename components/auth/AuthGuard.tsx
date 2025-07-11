@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { AuthScreen } from './AuthScreen'
+import { LandingPage } from './LandingPage'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
@@ -56,10 +56,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  // No user - show sign in/sign up
+  // No user - show landing page
   if (!user) {
-    console.log('🛡️ AuthGuard: No user, showing auth screen')
-    return <AuthScreen />;
+    console.log('🛡️ AuthGuard: No user, showing landing page')
+    return <LandingPage />;
   }
 
   // User exists but approval status is loading

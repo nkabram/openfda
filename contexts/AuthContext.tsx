@@ -160,18 +160,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     })
 
-    // If sign up successful and user is created, update the profile
-    if (!error && data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ full_name: fullName })
-        .eq('id', data.user.id)
-      
-      if (profileError) {
-        console.error('Error updating profile:', profileError)
-      }
-    }
-
     return { error }
   }
 

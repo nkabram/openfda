@@ -7,6 +7,7 @@ import { QueryHistory } from '../components/query-history'
 import { AdminQueryHistory } from '../components/admin-query-history'
 import { AuthWrapper } from '../components/auth/AuthWrapper'
 import { DisclaimerModal } from '../components/disclaimer-modal'
+import { ProjectConsentModal } from '../components/ProjectConsentModal'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { PanelLeft, PanelLeftOpen, Plus, User, Users, Settings } from 'lucide-react'
@@ -208,8 +209,9 @@ export default function Home() {
           </div>
         </div>
         
-          {/* Fixed Disclaimer in bottom right */}
-          <div className="fixed bottom-4 right-4 z-50">
+          {/* Fixed Disclaimer and Project Info in bottom right */}
+          <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+            <ProjectConsentModal />
             <DisclaimerModal />
           </div>
         </div>

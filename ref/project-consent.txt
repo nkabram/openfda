@@ -1,0 +1,31 @@
+Project Description
+Title:
+MedGuard-Rx: Enhancing Medication Safety with Retrieval-Augmented Clinical QA
+
+Purpose of the Project:
+This project aims to improve the quality and safety of clinical decision-making by using advanced AI models to answer medication-related clinical questions in real time. By analyzing anonymous queries submitted by clinicians during their practice, we seek to better understand the types of medication questions that arise and to evaluate the accuracy and safety of AI-generated responses. The insights gained will help optimize clinical question-answering systems and contribute to safer medication use.
+
+What Will Be Collected:
+When you use this application, the clinical queries you enter will be securely logged and stored. These queries will NOT include any patient-identifiable information (no names, birth dates, MRNs, or other PHI). Only the content of the query (e.g., "What is the recommended dose of metformin in renal failure?") and limited, non-identifying metadata (such as query timestamp) will be collected for research purposes.
+
+How Your Data Will Be Used:
+The data collected will be used solely for research aimed at improving clinical question-answering systems. No attempt will be made to identify users or patients. Findings may be published or presented in scientific forums, but only aggregate and anonymized results will be shared.
+
+Consent Statement
+Consent to Participate in Research
+
+By using this application, you acknowledge and agree to the following:
+
+Your clinical queries entered into the application will be anonymously logged and stored for research and quality improvement purposes.
+
+No personally identifiable information (PHI) or patient data should be entered into the queries. Users are responsible for ensuring that queries are anonymized.
+
+The data will be analyzed in aggregate to evaluate and improve AI-powered clinical decision support tools.
+
+Participation is voluntary. If you do not wish your queries to be used for research, do not use this application.
+
+There are no anticipated risks to participation since no identifiable information will be collected or used.
+
+If you have questions about the research or how your data is handled, you may contact the project team at [contact email].
+
+By signing up for or using this application, you provide your consent for your queries to be used in the manner described above.
