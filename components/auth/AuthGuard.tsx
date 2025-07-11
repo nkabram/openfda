@@ -1,88 +1,105 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { SignInScreen } from './SignInScreen'
-import { Skeleton } from '@/components/ui/skeleton'
-import { isLocalhost, shouldUseDevMode } from '@/lib/utils'
-import { useEffect, useState } from 'react'
+import { AuthScreen } from './AuthScreen'
+import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 interface AuthGuardProps {
   children: React.ReactNode
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
+  const { user, loading, isApproved, approvalLoading, isAdmin } = useAuth()
+  const router = useRouter()
   const [isClient, setIsClient] = useState(false)
-  const [isDevMode, setIsDevMode] = useState(false)
 
-  // Handle hydration by waiting for client-side render
   useEffect(() => {
     setIsClient(true)
-    setIsDevMode(shouldUseDevMode())
-    
-    // Listen for auth mode changes from localStorage
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'authMode') {
-        setIsDevMode(shouldUseDevMode())
-      }
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-    }
+    console.log('🛡️ AuthGuard initialized')
   }, [])
 
-  // During SSR or initial client render, show loading
+  // Handle redirect for unapproved users
+  useEffect(() => {
+    if (isClient && !isApproved && !isAdmin && !approvalLoading && !loading && user) {
+      console.log('🚀 Redirecting to waiting-approval page')
+      router.push('/waiting-approval')
+    }
+  }, [isClient, isApproved, isAdmin, approvalLoading, loading, user, router])
+
+  // During server-side rendering or hydration, return a simple div
+  // This prevents hydration errors by ensuring the server and client render the same content
   if (!isClient) {
-    return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="h-8 w-64 bg-muted rounded animate-pulse" />
-            <div className="h-8 w-8 bg-muted rounded-full animate-pulse" />
-          </div>
-        </div>
-      </div>
-    )
+    console.log('🛡️ AuthGuard: Server-side rendering or hydrating...')
+    return <div data-auth-guard-loading></div>
   }
 
-  // Skip authentication completely when in dev mode (after hydration)
-  if (isDevMode) {
-    return <>{children}</>
-  }
+  console.log('🛡️ AuthGuard state:', { 
+    isClient, 
+    loading, 
+    hasUser: !!user, 
+    isApproved, 
+    approvalLoading, 
+    isAdmin 
+  })
 
-  const { user, loading } = useAuth()
-
-  // Show loading skeleton while checking authentication
+  // Show loading while auth is initializing
   if (loading) {
+    console.log('🛡️ AuthGuard: Auth loading...')
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-4">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-64 w-full" />
-            </div>
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-48 w-full" />
-            </div>
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Authenticating...</p>
         </div>
       </div>
     )
   }
 
-  // Show sign-in screen if user is not authenticated
+  // No user - show sign in/sign up
   if (!user) {
-    return <SignInScreen />
+    console.log('🛡️ AuthGuard: No user, showing auth screen')
+    return <AuthScreen />;
   }
 
-  // User is authenticated, show the protected content
-  return <>{children}</>
+  // User exists but approval status is loading
+  if (approvalLoading) {
+    console.log('🛡️ AuthGuard: Approval loading...')
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-sm text-muted-foreground">Checking approval status...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // User is approved or admin - show content
+  if (isApproved || isAdmin) {
+    console.log('🔑 AuthGuard: User approved, showing content', {
+      isApproved,
+      isAdmin,
+      email: user?.email,
+      userId: user?.id
+    })
+    return <>{children}</>;
+  }
+
+  // User not approved - redirect to waiting page
+  console.log('🔑 AuthGuard: User not approved, redirecting', {
+    isApproved,
+    isAdmin,
+    email: user?.email,
+    userId: user?.id
+  })
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-2 text-sm text-muted-foreground">Redirecting...</p>
+      </div>
+    </div>
+  ); // Show loader while redirecting
 }

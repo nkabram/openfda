@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Clock, Pill, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
+import { useQueryCache } from '@/contexts/QueryCacheContext'
 import { isLocalhost } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -28,22 +29,27 @@ interface QueryHistoryProps {
 }
 
 export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId }: QueryHistoryProps) {
-  const [queries, setQueries] = useState<Query[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { toast } = useToast()
   const { session } = useAuth()
+  const { cache, setUserQueries, shouldRefetch, removeQuery } = useQueryCache()
 
-  useEffect(() => {
-    fetchQueries()
-  }, [refreshTrigger, session])
+  // Use cached queries
+  const queries = cache.userQueries
 
-  const fetchQueries = async () => {
+  const fetchQueries = useCallback(async (forceRefresh = false) => {
+    // Only fetch if cache is stale or forced
+    if (!forceRefresh && !shouldRefetch('user')) {
+      return
+    }
+
+    setIsLoading(true)
     try {
       const headers: Record<string, string> = {}
       
-      // Add authorization header for production (not localhost)
-      if (!isLocalhost() && session?.access_token) {
+      // Always add authorization header if session exists
+      if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
@@ -52,7 +58,7 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId 
         throw new Error('Failed to fetch queries')
       }
       const data = await response.json()
-      setQueries(data.queries || [])
+      setUserQueries(data.queries || [])
     } catch (error) {
       console.error('Error fetching queries:', error)
       toast({
@@ -62,15 +68,26 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId 
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [session?.access_token, shouldRefetch, setUserQueries, toast])
+
+  useEffect(() => {
+    fetchQueries()
+  }, [fetchQueries])
+
+  // Force refresh on trigger change
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      fetchQueries(true)
+    }
+  }, [refreshTrigger, fetchQueries])
 
   const handleDeleteQuery = async (queryId: string) => {
     setDeletingId(queryId)
     try {
       const headers: Record<string, string> = {}
       
-      // Add authorization header for production (not localhost)
-      if (!isLocalhost() && session?.access_token) {
+      // Always add authorization header if session exists
+      if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
@@ -83,8 +100,8 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId 
         throw new Error('Failed to delete query')
       }
 
-      // Remove from local state
-      setQueries(prev => prev.filter(q => q.id !== queryId))
+      // Remove from cache
+      removeQuery(queryId)
 
       // Clear selection if deleted query was selected
       if (selectedQueryId === queryId) {

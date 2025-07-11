@@ -1,0 +1,67 @@
+≡ƒöì DEBUGGING AUTHENTICATION FLOW
+
+
+============================================================
+Testing Admin User: nkabram@gmail.com
+User ID: 69cd1ba7-761b-4e3e-8bd5-aad74faba83f
+============================================================
+
+1. Checking auth.users table...
+Γ£à Auth user found:
+   Email: nkabram@gmail.com
+   Created: 2025-07-02T06:55:26.724107Z
+   Last Sign In: 2025-07-10T04:16:47.76259Z
+
+2. Checking profiles table...
+Γ£à Profile found:
+   Email: nkabram@gmail.com
+   Is Approved: true
+   Created: 2025-07-08T11:55:43.583457+00:00
+
+3. Checking admins table...
+Γ£à Admin record found:
+   ID: 1
+   Is Admin: true
+   Created: 2025-07-08T09:37:49.514617+00:00
+
+4. Simulating AuthContext logic...
+Γ£à User is admin - should be automatically approved
+   Expected behavior: Access granted to main app
+
+5. Checking for potential issues...
+
+============================================================
+Testing Regular User: nick@kortex.ai
+User ID: e323d6a3-b9ea-4c8f-8306-8b51bb115434
+============================================================
+
+1. Checking auth.users table...
+Γ£à Auth user found:
+   Email: nick@kortex.ai
+   Created: 2025-07-08T09:38:55.743114Z
+   Last Sign In: 2025-07-10T08:33:02.585113Z
+
+2. Checking profiles table...
+Γ£à Profile found:
+   Email: nick@kortex.ai
+   Is Approved: true
+   Created: 2025-07-08T09:38:55.736612+00:00
+
+3. Checking admins table...
+Γä╣∩╕Å  No admin record found (expected for regular users)
+
+4. Simulating AuthContext logic...
+Γ£à User is approved
+   Expected behavior: Access granted to main app
+
+5. Checking for potential issues...
+
+
+============================================================
+SUMMARY OF FINDINGS
+============================================================
+
+6. Checking RLS policies...
+Γ£à RLS is working - anonymous users cannot read profiles
+
+Γ£à Debug complete!

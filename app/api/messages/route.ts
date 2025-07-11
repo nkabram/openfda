@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { isLocalhost } from '@/lib/utils'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -40,31 +39,29 @@ export async function GET(request: NextRequest) {
 
     let userId = null
 
-    // For localhost development, user_id can be null
-    if (!isLocalhost()) {
-      const user = await getUserFromRequest(request)
-      if (!user) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        )
-      }
-      userId = user.id
+    // Always get user from request for proper authentication
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    userId = user.id
 
-      // Verify user has access to this query
-      const { data: query, error: queryError } = await supabase
-        .from('fda_queries')
-        .select('id')
-        .eq('id', queryId)
-        .eq('user_id', userId)
-        .single()
+    // Verify user has access to this query
+    const { data: query, error: queryError } = await supabase
+      .from('fda_queries')
+      .select('id')
+      .eq('id', queryId)
+      .eq('user_id', userId)
+      .single()
 
-      if (queryError || !query) {
-        return NextResponse.json(
-          { error: 'Query not found or access denied' },
-          { status: 404 }
-        )
-      }
+    if (queryError || !query) {
+      return NextResponse.json(
+        { error: 'Query not found or access denied' },
+        { status: 404 }
+      )
     }
 
     const { data, error } = await supabase

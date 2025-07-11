@@ -41,9 +41,11 @@ interface MedicationQueryFormProps {
   onQuerySaved?: (query: any) => void
   selectedQuery?: any
   newQueryTrigger?: number
+  isAdminView?: boolean
+  viewOnlyQuery?: any
 }
 
-export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigger }: MedicationQueryFormProps) {
+export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigger, isAdminView = false, viewOnlyQuery }: MedicationQueryFormProps) {
   const [query, setQuery] = useState('')
   const [response, setResponse] = useState<QueryResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -94,6 +96,26 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     }
   }, [selectedQuery])
 
+  // Effect to handle view-only query for admin
+  useEffect(() => {
+    if (viewOnlyQuery) {
+      setQuery(viewOnlyQuery.user_query)
+      setResponse({
+        response: viewOnlyQuery.ai_response,
+        medication: viewOnlyQuery.medication_name,
+        intents: viewOnlyQuery.detected_intents || [],
+        fdaSections: viewOnlyQuery.fda_sections_used || [],
+        fdaData: viewOnlyQuery.fda_response || null,
+        queryId: viewOnlyQuery.id
+      })
+      setCurrentQueryId(viewOnlyQuery.id)
+      setIsCollapsed(true)
+      
+      // Load follow-up messages for this query
+      loadFollowUpMessages(viewOnlyQuery.id)
+    }
+  }, [viewOnlyQuery])
+
   // Effect to handle new query trigger
   useEffect(() => {
     if (newQueryTrigger && newQueryTrigger > 0) {
@@ -106,8 +128,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     try {
       const headers: Record<string, string> = {}
       
-      // Add authorization header for production (not localhost)
-      if (!isLocalhost() && session?.access_token) {
+      // Always add authorization header if session exists
+      if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
@@ -150,8 +172,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       'Content-Type': 'application/json',
     }
     
-    // Add authorization header for production (not localhost)
-    if (!isLocalhost() && session?.access_token) {
+    // Always add authorization header if session exists
+    if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`
     }
     
@@ -487,7 +509,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {!isCollapsed && (
-                <span className="text-lg">💊 Ask a Medication Question</span>
+                <span className="text-lg">
+                  💊 {isAdminView ? 'View Query' : 'Ask a Medication Question'}
+                </span>
               )}
               {isCollapsed && response && (
                 <span className="text-lg">💊 Medication Query</span>
@@ -495,6 +519,11 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
               {isCollapsed && response && (
                 <div className="text-sm font-normal text-muted-foreground bg-muted px-2 py-1 rounded">
                   Query complete
+                </div>
+              )}
+              {isAdminView && (
+                <div className="text-sm font-normal text-blue-600 bg-blue-100 px-2 py-1 rounded dark:text-blue-400 dark:bg-blue-900/50">
+                  Admin View (Read Only)
                 </div>
               )}
             </div>
@@ -520,41 +549,89 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
         
         {!isCollapsed && (
           <CardContent className="border-t bg-muted/20">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Textarea
-                  placeholder="Ask any question about medications, side effects, interactions, dosages, etc. For example: 'What are the side effects of ibuprofen?' or 'Can I take aspirin with food?'"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="min-h-[100px] resize-none bg-background focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
-                  disabled={isLoading}
-                />
-                <p className="text-sm text-muted-foreground mt-2">
-                  Press Ctrl+Enter to submit
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isLoading || !query.trim()}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Ask Question
-                    </>
-                  )}
-                </Button>
-                {response && (
-                  <Button type="button" variant="outline" onClick={startNewQuery}>
-                    Ask Another Question
+            {/* User Information in Admin View */}
+            {isAdminView && (selectedQuery?.profiles || viewOnlyQuery) && (() => {
+              const queryData = viewOnlyQuery || selectedQuery
+              const userInfo = selectedQuery?.profiles || {
+                full_name: viewOnlyQuery?.full_name,
+                email: viewOnlyQuery?.email
+              }
+              
+              return (
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-blue-700 dark:text-blue-300">User:</span>
+                    <span className="text-blue-600 dark:text-blue-400">
+                      {userInfo?.full_name || userInfo?.email || 'Unknown User'}
+                    </span>
+                    {userInfo?.full_name && userInfo?.email && (
+                      <span className="text-blue-500 dark:text-blue-400 text-xs">({userInfo.email})</span>
+                    )}
+                    <span className="text-blue-500 dark:text-blue-400 text-xs ml-auto">
+                      {new Date(queryData.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                </div>
+              )
+            })()}
+            
+            {!isAdminView ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Textarea
+                    placeholder="Ask any question about medications, side effects, interactions, dosages, etc. For example: 'What are the side effects of ibuprofen?' or 'Can I take aspirin with food?'"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="min-h-[100px] resize-none bg-background focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
+                    disabled={isLoading}
+                  />
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Press Ctrl+Enter to submit
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={isLoading || !query.trim()}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Ask Question
+                      </>
+                    )}
                   </Button>
-                )}
+                  {response && (
+                    <Button type="button" variant="outline" onClick={startNewQuery}>
+                      Ask Another Question
+                    </Button>
+                  )}
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                    User's Question:
+                  </label>
+                  <div className="min-h-[100px] p-3 bg-muted/50 rounded-md border text-sm">
+                    {viewOnlyQuery?.user_query || selectedQuery?.user_query || query}
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  This query is read-only in admin view. Use "Create Personal Query" to ask your own questions.
+                </div>
               </div>
-            </form>
+            )}
           </CardContent>
         )}
 
@@ -870,7 +947,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       )}
 
       {/* Follow-up Input - Simplified Chat Style */}
-      {response && currentQueryId && (
+      {response && currentQueryId && !isAdminView && (
         <div className="space-y-4">
           <form onSubmit={handleFollowUpSubmit} className="relative">
             <Textarea

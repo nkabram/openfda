@@ -25,22 +25,4 @@ export function isLocalhost(): boolean {
   );
 }
 
-// Auth mode preference for development
-export function getAuthModePreference(): 'dev' | 'auth' {
-  if (typeof window === "undefined") return 'dev'
-  
-  const preference = localStorage.getItem('authMode')
-  return (preference as 'dev' | 'auth') || 'dev'
-}
 
-export function setAuthModePreference(mode: 'dev' | 'auth'): void {
-  if (typeof window === "undefined") return
-  
-  localStorage.setItem('authMode', mode)
-}
-
-export function shouldUseDevMode(): boolean {
-  if (!isLocalhost()) return false
-  
-  return getAuthModePreference() === 'dev'
-}

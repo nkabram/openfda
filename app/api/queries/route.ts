@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { isLocalhost } from '@/lib/utils'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase environment variables:', {
-    url: !!supabaseUrl,
-    key: !!supabaseKey
-  })
+  console.error('Missing Supabase environment variables')
 }
 
 const supabase = createClient(supabaseUrl!, supabaseKey!)
@@ -31,50 +27,114 @@ async function getUserFromRequest(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // For localhost development, return all queries
-    if (isLocalhost()) {
+    const { searchParams } = new URL(request.url)
+    const viewType = searchParams.get('view') // 'admin' or 'user'
+    
+    // Get user from request
+    const user = await getUserFromRequest(request)
+    if (!user) {
+
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
+
+
+    if (viewType === 'admin') {
+      // First check if user is approved
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_approved')
+        .eq('id', user.id)
+        .single()
+      
+      if (profileError || !profileData?.is_approved) {
+        return NextResponse.json(
+          { error: 'Forbidden - User not approved' },
+          { status: 403 }
+        )
+      }
+
+      // Then check if user is admin - don't use single() to avoid errors
+      const { data: adminData } = await supabase
+        .from('admins')
+        .select('is_admin')
+        .eq('user_id', user.id)
+        .eq('is_admin', true)
+      
+      // If no admin records found, user is not admin
+      if (!adminData || adminData.length === 0) {
+        return NextResponse.json(
+          { error: 'Forbidden - Admin access required' },
+          { status: 403 }
+        )
+      }
+
+      // User is admin, fetch all queries
+      const { data: queries, error: queriesError } = await supabase
+        .from('fda_queries')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (queriesError) {
+        console.error('Error fetching admin queries:', queriesError)
+        return NextResponse.json(
+          { error: 'Error fetching queries' },
+          { status: 500 }
+        )
+      }
+
+      // Fetch user profiles separately to avoid join issues
+      const userIds = [...new Set(queries?.map(q => q.user_id).filter(Boolean) || [])]
+      
+      let profilesMap: Record<string, any> = {}
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .in('id', userIds)
+        
+        if (!profilesError && profiles) {
+          profilesMap = profiles.reduce((acc, profile) => {
+            acc[profile.id] = profile
+            return acc
+          }, {} as Record<string, any>)
+        }
+      }
+      
+      // Combine queries with user info
+      const queriesWithUserInfo = queries?.map(query => ({
+        ...query,
+        profiles: profilesMap[query.user_id] || null,
+        user_email: profilesMap[query.user_id]?.email || 'Unknown',
+        user_name: profilesMap[query.user_id]?.full_name || 'Unknown User'
+      })) || []
+
+
+      return NextResponse.json({ queries: queriesWithUserInfo })
+    } else {
+      // Regular user view - get only user's own queries
+
       const { data, error } = await supabase
         .from('fda_queries')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50)
 
       if (error) {
-        console.error('Error fetching queries:', error)
+        console.error('Error fetching user queries:', error)
         return NextResponse.json(
           { error: 'Failed to fetch queries' },
           { status: 500 }
         )
       }
 
+
       return NextResponse.json({ queries: data || [] })
     }
-
-    // For production, get user and return only their queries
-    const user = await getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const { data, error } = await supabase
-      .from('fda_queries')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50)
-
-    if (error) {
-      console.error('Error fetching queries:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch queries' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ queries: data || [] })
   } catch (error) {
     console.error('Error in queries GET:', error)
     return NextResponse.json(
@@ -95,25 +155,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let userId = null
-
-    // For localhost development, user_id can be null
-    if (!isLocalhost()) {
-      const user = await getUserFromRequest(request)
-      if (!user) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        )
-      }
-      userId = user.id
+    // Get user from request
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
     }
 
+    // Use service role client to insert the query with user_id
     const { data, error } = await supabase
       .from('fda_queries')
       .insert([
         {
-          user_id: userId,
+          user_id: user.id,
           user_query: userQuery,
           medication_name: extractedMedication,
           fda_response: openfdaResponse,
@@ -152,27 +208,19 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    let userId = null
-
-    // For localhost development, user_id can be null
-    if (!isLocalhost()) {
-      const user = await getUserFromRequest(request)
-      if (!user) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        )
-      }
-      userId = user.id
+    // Always require authentication
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
     }
-
-    // Build the filter based on environment
-    const deleteFilter = userId ? { id: queryId, user_id: userId } : { id: queryId }
 
     const { error } = await supabase
       .from('fda_queries')
       .delete()
-      .match(deleteFilter)
+      .match({ id: queryId, user_id: user.id })
 
     if (error) {
       console.error('Error deleting query:', error)
