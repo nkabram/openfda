@@ -47,7 +47,7 @@ async function isUserAdmin(userId: string): Promise<boolean> {
       .eq('is_admin', true)
 
     // If we found any matching admin records, user is admin
-    return adminData && adminData.length > 0
+    return Boolean(adminData && adminData.length > 0)
   } catch (error) {
     console.error('Error checking admin status:', error)
     return false

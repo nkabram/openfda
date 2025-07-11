@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Fetch user profiles separately to avoid join issues
-      const userIds = [...new Set(queries?.map(q => q.user_id).filter(Boolean) || [])]
+      const userIds = Array.from(new Set(queries?.map(q => q.user_id).filter(Boolean))) as string[]
       
       let profilesMap: Record<string, any> = {}
       if (userIds.length > 0) {

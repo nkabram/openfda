@@ -119,7 +119,7 @@ EXAMPLES:
       return NextResponse.json({ 
         medication, 
         intents,
-        fdaSections: intents.length > 0 ? intents.flatMap(intent => FDA_SECTION_MAPPINGS[intent]?.fields || []) : []
+        fdaSections: intents.length > 0 ? intents.flatMap((intent: keyof typeof FDA_SECTION_MAPPINGS) => FDA_SECTION_MAPPINGS[intent]?.fields || []) : []
       })
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError, 'Response:', responseText)

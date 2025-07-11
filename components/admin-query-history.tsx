@@ -21,6 +21,8 @@ interface QueryWithUser {
     email: string
     full_name: string
   }
+  email?: string
+  full_name?: string
 }
 
 interface AdminQueryHistoryProps {
