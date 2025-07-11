@@ -1,0 +1,2 @@
+# Explicitly ignore the route.ts file to prevent deployment conflicts
+app/auth/callback/route.ts

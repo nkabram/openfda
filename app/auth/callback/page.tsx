@@ -1,5 +1,6 @@
 'use client'
 
+// Updated callback page - route.ts has been removed to fix the deployment conflict
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
