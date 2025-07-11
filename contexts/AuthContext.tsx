@@ -136,7 +136,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { 
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          prompt: 'select_account'
+        }
+      },
     })
     if (error) console.error('Error signing in:', error.message)
   }
@@ -171,7 +176,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    // Sign out from Supabase
     await supabase.auth.signOut()
+    
+    // Clear any cached Google auth state by redirecting to Google's logout
+    // This ensures the next sign-in will prompt for account selection
+    if (typeof window !== 'undefined') {
+      // Optional: Clear local storage items that might cache auth state
+      localStorage.removeItem('supabase.auth.token')
+      
+      // Force a brief redirect to Google's logout to clear their session
+      // This is done in a hidden iframe to avoid disrupting the user experience
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      iframe.src = 'https://accounts.google.com/logout'
+      document.body.appendChild(iframe)
+      
+      // Remove the iframe after a short delay
+      setTimeout(() => {
+        document.body.removeChild(iframe)
+      }, 1000)
+    }
   }
 
   const value = {
