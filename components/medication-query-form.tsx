@@ -9,6 +9,7 @@ import * as Collapsible from '@radix-ui/react-collapsible'
 import { useToast } from '@/hooks/use-toast'
 import { ProgressIndicator, ProgressStep } from '@/components/ui/progress-indicator'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUserQueries } from '@/hooks/useQueries'
 import { isLocalhost } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -68,7 +69,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   const followUpRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
   const { session } = useAuth()
-  
+  const { addQuery: addQueryToCache } = useUserQueries({ autoFetch: false })
+
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([
     { id: 'identify', label: 'Identifying medication & intent', status: 'pending' },
     { id: 'search', label: 'Searching FDA documents', status: 'pending' },
@@ -304,20 +306,27 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       if (responseData.queryId) {
         setCurrentQueryId(responseData.queryId)
         
+        // Create a query object for cache and parent component
+        const newQuery = {
+          id: responseData.queryId,
+          user_query: query,
+          medication_name: responseData.medication,
+          detected_intents: responseData.intents,
+          fda_sections: responseData.fdaSections,
+          fda_response: responseData.fdaData,
+          ai_response: responseData.response,
+          created_at: new Date().toISOString(),
+          message_count: 0
+        }
+        
+        // Add to cache for immediate UI update
+        if (!isAdminView) {
+          addQueryToCache(newQuery)
+        }
+        
         // Notify parent component to update query history if needed
         if (onQuerySaved) {
-          // Create a query object for the parent component
-          const queryForParent = {
-            id: responseData.queryId,
-            user_query: query,
-            medication_name: responseData.medication,
-            detected_intents: responseData.intents,
-            fda_sections: responseData.fdaSections,
-            fda_response: responseData.fdaData,
-            ai_response: responseData.response,
-            created_at: new Date().toISOString()
-          }
-          onQuerySaved(queryForParent)
+          onQuerySaved(newQuery)
         }
       }
 

@@ -1,15 +1,14 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Badge } from '@/components/ui/badge'
-import { Clock, Pill, MoreHorizontal, Trash2 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
-import { useAuth } from '@/contexts/AuthContext'
-import { useQueryCache } from '@/contexts/QueryCacheContext'
-import { isLocalhost } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Trash2, MessageSquare, Calendar, Pill, RefreshCw, Clock, MoreHorizontal } from 'lucide-react'
+import { useUserQueries } from '@/hooks/useQueries'
+import { useToast } from '@/hooks/use-toast'
+import { format } from 'date-fns'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 
@@ -29,105 +28,79 @@ interface QueryHistoryProps {
 }
 
 export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId }: QueryHistoryProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const { toast } = useToast()
-  const { session } = useAuth()
-  const { cache, setUserQueries, shouldRefetch, removeQuery } = useQueryCache()
-
-  // Use cached queries
-  const queries = cache.userQueries
-
-  const fetchQueries = useCallback(async (forceRefresh = false) => {
-    // Only fetch if cache is stale or forced
-    if (!forceRefresh && !shouldRefetch('user')) {
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const headers: Record<string, string> = {}
-      
-      // Always add authorization header if session exists
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
-      }
-
-      const response = await fetch('/api/queries', { headers })
-      if (!response.ok) {
-        throw new Error('Failed to fetch queries')
-      }
-      const data = await response.json()
-      setUserQueries(data.queries || [])
-    } catch (error) {
-      console.error('Error fetching queries:', error)
+  const {
+    queries,
+    loading: isLoading,
+    error,
+    refetch,
+    deleteQuery,
+    cacheStats
+  } = useUserQueries({
+    onError: (error) => {
       toast({
         title: "Failed to load query history",
+        description: error.message,
         variant: "destructive",
       })
-    } finally {
-      setIsLoading(false)
     }
-  }, [session?.access_token, shouldRefetch, setUserQueries, toast])
+  })
 
+  // Handle error display
   useEffect(() => {
-    fetchQueries()
-  }, [fetchQueries])
+    if (error) {
+      console.error('Query history error:', error)
+    }
+  }, [error])
 
   // Force refresh on trigger change
   useEffect(() => {
     if (refreshTrigger && refreshTrigger > 0) {
-      fetchQueries(true)
+      refetch(true)
     }
-  }, [refreshTrigger, fetchQueries])
+  }, [refreshTrigger, refetch])
 
-  const handleDeleteQuery = async (queryId: string) => {
-    setDeletingId(queryId)
+  const handleDeleteQuery = useCallback(async (queryId: string) => {
     try {
-      const headers: Record<string, string> = {}
+      // Optimistically remove from cache
+      deleteQuery(queryId)
       
-      // Always add authorization header if session exists
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
-      }
-
-      const response = await fetch(`/api/queries?id=${queryId}`, {
-        method: 'DELETE',
-        headers
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete query')
-      }
-
-      // Remove from cache
-      removeQuery(queryId)
-
       // Clear selection if deleted query was selected
       if (selectedQueryId === queryId) {
         onQuerySelected?.(null as any)
       }
-
-      toast({
-        title: "Query deleted successfully",
+      
+      const response = await fetch(`/api/queries?id=${queryId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}` // Fallback auth
+        }
       })
+
+      if (response.ok) {
+        toast({
+          title: "Query deleted successfully",
+        })
+      } else {
+        // If API call fails, refresh to restore correct state
+        await refetch(true)
+        throw new Error('Failed to delete query')
+      }
     } catch (error) {
       console.error('Error deleting query:', error)
       toast({
         title: "Failed to delete query",
+        description: "The query may still exist. Please refresh to see the current state.",
         variant: "destructive",
       })
-    } finally {
-      setDeletingId(null)
+      // Refresh to get correct state
+      await refetch(true)
     }
-  }
+  }, [deleteQuery, refetch, toast, selectedQueryId, onQuerySelected])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    })
+    return format(date, 'MMM d, yyyy h:mm a')
   }
 
   const truncateText = (text: string, maxLength: number = 100) => {
@@ -157,8 +130,30 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId 
   }
 
   return (
-    <ScrollArea className="h-[calc(100vh-8rem)]">
-      <div className="p-4 space-y-3">
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5" />
+          Query History
+          {queries.length > 0 && (
+            <Badge variant="secondary" className="ml-auto">
+              {queries.length} {queries.length === 1 ? 'query' : 'queries'}
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch(true)}
+            disabled={isLoading}
+            className="ml-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ScrollArea className="h-[calc(100vh-12rem)]">
+          <div className="p-4 space-y-3">
         {queries.map((query) => (
           <Card 
             key={query.id} 
@@ -190,7 +185,6 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId 
                           variant="ghost" 
                           size="sm" 
                           className="h-8 w-8 p-0"
-                          disabled={deletingId === query.id}
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
@@ -243,7 +237,9 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId 
             </CardContent>
           </Card>
         ))}
-      </div>
-    </ScrollArea>
+          </div>
+        </ScrollArea>
+      </CardContent>
+    </Card>
   )
 }

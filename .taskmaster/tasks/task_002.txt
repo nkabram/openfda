@@ -1,0 +1,24 @@
+# Task ID: 2
+# Title: Integrate Supabase for Authentication and Database
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Set up Supabase for user authentication, database storage, and Row Level Security (RLS) policies.
+# Details:
+1. Create a Supabase project
+2. Install Supabase client: `npm install @supabase/supabase-js`
+3. Configure Supabase client in a utility file
+4. Set up environment variables for Supabase URL and API key
+5. Create database tables for user profiles, queries, and admin management
+6. Implement Row Level Security (RLS) policies for data isolation
+7. Configure foreign key relationships for data integrity
+8. Set up authentication providers (email/password, Google OAuth)
+9. Create helper functions for database operations
+
+# Test Strategy:
+1. Test connection to Supabase
+2. Verify database schema creation
+3. Test RLS policies by attempting unauthorized access
+4. Validate foreign key constraints
+5. Test authentication flows for both email/password and Google OAuth
+6. Verify data isolation between different users

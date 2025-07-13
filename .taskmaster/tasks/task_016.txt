@@ -1,0 +1,33 @@
+# Task ID: 16
+# Title: Optimize Authentication State Management
+# Status: pending
+# Dependencies: 3
+# Priority: high
+# Description: Fix the issue where user approval status and admin status checks are performed on every page reload by implementing persistent authentication state that only checks status once per session.
+# Details:
+1. Analyze the current AuthContext implementation to identify where checkApprovalStatus is being called
+2. Modify the authentication context to store approval and admin status in localStorage or sessionStorage after initial verification
+3. Update the authentication flow to only check status on explicit login events:
+   - On successful login, fetch and store approval/admin status
+   - On logout, clear the stored status information
+4. Implement a mechanism to read status from storage on page reload instead of making API calls
+5. Add a function to force status refresh when needed (e.g., after admin actions)
+6. Update the useAuth hook to expose the cached status values
+7. Ensure proper error handling if stored values become corrupted
+8. Add timestamp to stored values to implement optional expiration (e.g., force refresh after 24 hours)
+9. Update protected routes to use the cached status values
+10. Implement a fallback mechanism to re-fetch status if storage is unavailable
+11. Add clear documentation for the authentication state management approach
+
+# Test Strategy:
+1. Verify that approval status is only checked once per session by monitoring network requests
+2. Test that status is correctly stored in localStorage/sessionStorage after login
+3. Verify that page reloads do not trigger unnecessary API calls to /api/auth/status
+4. Test that logout properly clears stored authentication state
+5. Verify that protected routes still function correctly with the cached status
+6. Test the force refresh functionality to ensure it updates the stored values
+7. Simulate storage unavailability to verify fallback mechanism works
+8. Test with multiple browser tabs to ensure consistent authentication state
+9. Verify that admin users still have proper access to admin features
+10. Test with various user types (approved, unapproved, admin) to ensure correct behavior
+11. Measure performance improvement by comparing page load times before and after implementation

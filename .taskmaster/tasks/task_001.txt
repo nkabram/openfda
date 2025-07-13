@@ -1,0 +1,23 @@
+# Task ID: 1
+# Title: Setup Next.js Project with TypeScript and Tailwind CSS
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Initialize the Next.js 14 project with TypeScript and configure Tailwind CSS for styling.
+# Details:
+1. Create a new Next.js 14 project using `npx create-next-app@latest medguardrx --typescript`
+2. Configure Tailwind CSS by installing required packages: `npm install -D tailwindcss postcss autoprefixer`
+3. Initialize Tailwind: `npx tailwindcss init -p`
+4. Set up folder structure for components, pages, and API routes
+5. Configure environment variables for development and production
+6. Set up dark/light theme support using Tailwind's dark mode
+7. Create basic layout components (Header, Footer, Layout wrapper)
+8. Configure TypeScript settings in tsconfig.json
+9. Set up ESLint and Prettier for code quality
+
+# Test Strategy:
+1. Verify successful project initialization with `npm run dev`
+2. Confirm TypeScript compilation works without errors
+3. Test Tailwind CSS functionality by applying sample classes
+4. Verify dark/light theme toggle functionality
+5. Ensure responsive design works across different viewport sizes

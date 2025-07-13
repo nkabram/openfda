@@ -1,0 +1,398 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Next.js Project with TypeScript and Tailwind CSS",
+        "description": "Initialize the Next.js 14 project with TypeScript and configure Tailwind CSS for styling.",
+        "details": "1. Create a new Next.js 14 project using `npx create-next-app@latest medguardrx --typescript`\n2. Configure Tailwind CSS by installing required packages: `npm install -D tailwindcss postcss autoprefixer`\n3. Initialize Tailwind: `npx tailwindcss init -p`\n4. Set up folder structure for components, pages, and API routes\n5. Configure environment variables for development and production\n6. Set up dark/light theme support using Tailwind's dark mode\n7. Create basic layout components (Header, Footer, Layout wrapper)\n8. Configure TypeScript settings in tsconfig.json\n9. Set up ESLint and Prettier for code quality",
+        "testStrategy": "1. Verify successful project initialization with `npm run dev`\n2. Confirm TypeScript compilation works without errors\n3. Test Tailwind CSS functionality by applying sample classes\n4. Verify dark/light theme toggle functionality\n5. Ensure responsive design works across different viewport sizes",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Integrate Supabase for Authentication and Database",
+        "description": "Set up Supabase for user authentication, database storage, and Row Level Security (RLS) policies.",
+        "details": "1. Create a Supabase project\n2. Install Supabase client: `npm install @supabase/supabase-js`\n3. Configure Supabase client in a utility file\n4. Set up environment variables for Supabase URL and API key\n5. Create database tables for user profiles, queries, and admin management\n6. Implement Row Level Security (RLS) policies for data isolation\n7. Configure foreign key relationships for data integrity\n8. Set up authentication providers (email/password, Google OAuth)\n9. Create helper functions for database operations",
+        "testStrategy": "1. Test connection to Supabase\n2. Verify database schema creation\n3. Test RLS policies by attempting unauthorized access\n4. Validate foreign key constraints\n5. Test authentication flows for both email/password and Google OAuth\n6. Verify data isolation between different users",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Implement User Authentication System",
+        "description": "Develop the authentication system with multi-modal login options, email verification, and password reset functionality.",
+        "details": "1. Create authentication context provider using React Context API\n2. Implement sign-up form with email/password\n3. Add Google OAuth integration using Supabase Auth\n4. Create login page with both authentication options\n5. Implement email verification flow\n6. Create password reset functionality\n7. Add authentication state persistence\n8. Implement protected routes using Next.js middleware\n9. Create logout functionality\n10. Add domain-based auto-approval logic for trusted domains (*.ah.org, umich.edu)",
+        "testStrategy": "1. Test user registration with email/password\n2. Verify Google OAuth authentication flow\n3. Test email verification process\n4. Verify password reset functionality\n5. Test authentication persistence across page refreshes\n6. Verify protected routes redirect unauthenticated users\n7. Test auto-approval for trusted domains\n8. Verify logout functionality clears session data",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Create Role-Based Access Control System",
+        "description": "Implement role-based access control to differentiate between regular users and administrators.",
+        "details": "1. Extend user profile schema to include role field (admin, user)\n2. Create middleware to check user roles for protected routes\n3. Implement role-based UI rendering\n4. Create higher-order components for role-based component rendering\n5. Set up admin-specific routes and API endpoints\n6. Implement role assignment logic in user management\n7. Create role-based navigation components\n8. Add role verification to API routes\n9. Implement role-based redirects",
+        "testStrategy": "1. Test role assignment during user creation\n2. Verify admin-only routes are protected\n3. Test role-based UI rendering\n4. Verify API endpoints enforce role-based access\n5. Test role-based navigation visibility\n6. Verify middleware correctly identifies and restricts access based on roles",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Develop Admin Dashboard",
+        "description": "Create an administrative dashboard for user management, system analytics, and query monitoring.",
+        "details": "1. Design admin dashboard layout with navigation\n2. Implement user management interface (list, approve, reject, edit)\n3. Create domain management for auto-approval settings\n4. Develop system analytics dashboard with usage metrics\n5. Implement query monitoring interface\n6. Add user activity tracking and display\n7. Create admin-only query viewing in read-only mode\n8. Implement filtering and sorting for all admin views\n9. Add pagination for large data sets\n10. Create export functionality for reports",
+        "testStrategy": "1. Test user management operations (approve, reject, edit)\n2. Verify domain management functionality\n3. Test analytics data display\n4. Verify query monitoring interface shows accurate data\n5. Test filtering, sorting, and pagination\n6. Verify export functionality generates correct data\n7. Test admin-only query viewing",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Integrate OpenFDA API",
+        "description": "Implement integration with the OpenFDA API for medication data retrieval.",
+        "details": "1. Research OpenFDA API endpoints and documentation\n2. Create API client for OpenFDA with appropriate rate limiting\n3. Implement error handling and retry logic\n4. Create data models for FDA medication information\n5. Implement query builders for different FDA endpoints\n6. Add caching layer for FDA responses\n7. Create utility functions for data transformation\n8. Implement pagination for large result sets\n9. Add logging for API requests and responses\n10. Create documentation for supported query types",
+        "testStrategy": "1. Test API client with sample queries\n2. Verify error handling with invalid requests\n3. Test rate limiting functionality\n4. Verify caching reduces duplicate API calls\n5. Test data transformation functions\n6. Verify pagination works for large result sets\n7. Test all supported query types return expected data",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Implement Natural Language Query Processing",
+        "description": "Develop the system to process natural language medication queries and detect user intent.",
+        "details": "1. Integrate OpenAI API for natural language processing\n2. Create intent detection system for query classification\n3. Implement query preprocessing pipeline\n4. Develop mapping between detected intents and FDA API endpoints\n5. Create query templates for common medication questions\n6. Implement entity extraction for medication names and parameters\n7. Add confidence scoring for intent detection\n8. Create fallback mechanisms for low-confidence queries\n9. Implement query refinement suggestions\n10. Add logging for query processing steps",
+        "testStrategy": "1. Test intent detection with sample queries\n2. Verify entity extraction for medication names\n3. Test mapping between intents and FDA endpoints\n4. Verify confidence scoring identifies ambiguous queries\n5. Test fallback mechanisms\n6. Verify query refinement suggestions are relevant\n7. Test with a variety of query types (dosage, ingredients, indications, warnings, adverse reactions)",
+        "priority": "high",
+        "dependencies": [
+          6
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Develop AI-Powered Response Generation",
+        "description": "Create the system for generating context-aware responses based on user intent and FDA data.",
+        "details": "1. Implement OpenAI integration for response generation\n2. Create response templates for different query types\n3. Develop context management for conversation history\n4. Implement multiple response modes (FDA docs only, web search, LLM general knowledge)\n5. Create citation and source tracking system\n6. Implement follow-up question detection\n7. Add response formatting for readability\n8. Create error handling for failed response generation\n9. Implement response caching for performance\n10. Add logging for response generation process",
+        "testStrategy": "1. Test response generation with sample queries\n2. Verify context awareness with follow-up questions\n3. Test different response modes\n4. Verify citation and source tracking\n5. Test error handling with edge cases\n6. Verify response formatting is consistent\n7. Test response caching improves performance",
+        "priority": "high",
+        "dependencies": [
+          7
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Create Query Interface and Conversation UI",
+        "description": "Develop the user interface for medication queries and conversation threading.",
+        "details": "1. Design query input interface with suggestions\n2. Implement conversation threading UI\n3. Create progress indicators for query processing\n4. Develop response display with formatting\n5. Implement follow-up question interface\n6. Add response mode selection UI\n7. Create citation display and linking\n8. Implement error states and user feedback\n9. Add keyboard shortcuts for common actions\n10. Create responsive design for all viewport sizes",
+        "testStrategy": "1. Test query input with various query types\n2. Verify conversation threading displays correctly\n3. Test progress indicators during processing\n4. Verify response formatting is readable\n5. Test follow-up question interface\n6. Verify response mode selection works\n7. Test citation links open correct sources\n8. Verify error states provide useful feedback\n9. Test responsive design on different devices",
+        "priority": "medium",
+        "dependencies": [
+          8
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Implement Query History and Data Management",
+        "description": "Develop the system for storing and managing query history with user isolation.",
+        "details": "1. Create database schema for query history\n2. Implement query saving functionality\n3. Develop query history UI with filtering\n4. Create message threading for conversations\n5. Implement user isolation for query data\n6. Add query export functionality\n7. Create query deletion and editing features\n8. Implement pagination for large history lists\n9. Add search functionality for past queries\n10. Create audit trail for all user interactions",
+        "testStrategy": "1. Test query saving and retrieval\n2. Verify message threading maintains conversation context\n3. Test user isolation prevents access to others' queries\n4. Verify export functionality produces correct data\n5. Test query deletion and editing\n6. Verify pagination works for large history lists\n7. Test search functionality finds relevant queries\n8. Verify audit trail records all interactions",
+        "priority": "medium",
+        "dependencies": [
+          9
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Develop Landing Page and User Onboarding",
+        "description": "Create the professional landing page with consent management and user onboarding flow.",
+        "details": "1. Design professional landing page with product information\n2. Implement consent management system\n3. Create user onboarding flow\n4. Develop disclaimer and terms of service modals\n5. Implement FDA clinical decision-making disclaimers\n6. Create OpenFDA terms of service integration\n7. Add user feedback collection\n8. Implement feature highlights and tutorials\n9. Create responsive design for landing page\n10. Add analytics tracking for conversion metrics",
+        "testStrategy": "1. Test landing page on different devices\n2. Verify consent management records user consent\n3. Test onboarding flow completion\n4. Verify disclaimer modals display correctly\n5. Test terms of service acceptance\n6. Verify feedback collection works\n7. Test tutorials and feature highlights\n8. Verify analytics tracking records correct events",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Implement Caching and Performance Optimization",
+        "description": "Develop caching mechanisms and performance optimizations for the application.",
+        "details": "1. Implement query result caching\n2. Create API response caching\n3. Develop client-side state caching\n4. Implement server-side rendering for key pages\n5. Add static generation for suitable content\n6. Create image optimization pipeline\n7. Implement code splitting and lazy loading\n8. Add performance monitoring\n9. Create database query optimization\n10. Implement CDN configuration for static assets",
+        "testStrategy": "1. Test query caching reduces API calls\n2. Verify API response caching improves performance\n3. Test client-side state persistence\n4. Verify server-side rendering improves initial load time\n5. Test image optimization reduces payload size\n6. Verify code splitting reduces initial bundle size\n7. Test performance metrics before and after optimizations\n8. Verify CDN serves static assets correctly",
+        "priority": "medium",
+        "dependencies": [
+          6,
+          8,
+          10
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "Create Compliance and Safety Features",
+        "description": "Implement compliance features including disclaimers, data privacy, and security measures.",
+        "details": "1. Create comprehensive disclaimer system\n2. Implement data privacy controls\n3. Develop security measures for sensitive data\n4. Create compliance documentation\n5. Implement user data export functionality\n6. Add account deletion capability\n7. Create audit logging for compliance purposes\n8. Implement session timeout for security\n9. Add CSRF protection\n10. Create rate limiting for API endpoints",
+        "testStrategy": "1. Test disclaimer display and acceptance\n2. Verify data privacy controls protect user information\n3. Test security measures with penetration testing\n4. Verify user data export produces complete data\n5. Test account deletion removes all user data\n6. Verify audit logging captures required events\n7. Test session timeout functionality\n8. Verify CSRF protection prevents attacks\n9. Test rate limiting prevents abuse",
+        "priority": "high",
+        "dependencies": [
+          3,
+          4
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "Implement Monitoring and Error Handling",
+        "description": "Develop comprehensive monitoring, logging, and error handling systems.",
+        "details": "1. Implement application-wide error boundary\n2. Create structured logging system\n3. Develop error reporting to external service\n4. Implement performance monitoring\n5. Create user-facing error messages\n6. Develop system health dashboard\n7. Implement automated alerts for critical errors\n8. Create error categorization and prioritization\n9. Add debugging tools for development\n10. Implement graceful degradation for service outages",
+        "testStrategy": "1. Test error boundary catches component errors\n2. Verify logging system captures important events\n3. Test error reporting sends correct information\n4. Verify performance monitoring tracks key metrics\n5. Test user-facing error messages are helpful\n6. Verify health dashboard shows accurate status\n7. Test alerts trigger for critical errors\n8. Verify graceful degradation during service outages",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          2,
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "Configure Deployment and CI/CD Pipeline",
+        "description": "Set up deployment infrastructure and continuous integration/continuous deployment pipeline.",
+        "details": "1. Configure Vercel for frontend hosting\n2. Set up Supabase cloud for backend services\n3. Create environment-specific configurations\n4. Implement CI/CD pipeline with GitHub Actions\n5. Set up automated testing in CI pipeline\n6. Create deployment preview environments\n7. Implement database migration strategy\n8. Add deployment approval process\n9. Create rollback procedures\n10. Implement monitoring for deployed environments",
+        "testStrategy": "1. Test deployment to development environment\n2. Verify production deployment process\n3. Test CI pipeline with sample changes\n4. Verify environment-specific configurations work\n5. Test database migrations\n6. Verify preview environments match production\n7. Test rollback procedures restore previous state\n8. Verify monitoring works in deployed environments",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2,
+          14
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 16,
+        "title": "Optimize Authentication State Management",
+        "description": "Fix the issue where user approval status and admin status checks are performed on every page reload by implementing persistent authentication state that only checks status once per session.",
+        "details": "1. Analyze the current AuthContext implementation to identify where checkApprovalStatus is being called\n2. Modify the authentication context to store approval and admin status in localStorage or sessionStorage after initial verification\n3. Update the authentication flow to only check status on explicit login events:\n   - On successful login, fetch and store approval/admin status\n   - On logout, clear the stored status information\n4. Implement a mechanism to read status from storage on page reload instead of making API calls\n5. Add a function to force status refresh when needed (e.g., after admin actions)\n6. Update the useAuth hook to expose the cached status values\n7. Ensure proper error handling if stored values become corrupted\n8. Add timestamp to stored values to implement optional expiration (e.g., force refresh after 24 hours)\n9. Update protected routes to use the cached status values\n10. Implement a fallback mechanism to re-fetch status if storage is unavailable\n11. Add clear documentation for the authentication state management approach",
+        "testStrategy": "1. Verify that approval status is only checked once per session by monitoring network requests\n2. Test that status is correctly stored in localStorage/sessionStorage after login\n3. Verify that page reloads do not trigger unnecessary API calls to /api/auth/status\n4. Test that logout properly clears stored authentication state\n5. Verify that protected routes still function correctly with the cached status\n6. Test the force refresh functionality to ensure it updates the stored values\n7. Simulate storage unavailability to verify fallback mechanism works\n8. Test with multiple browser tabs to ensure consistent authentication state\n9. Verify that admin users still have proper access to admin features\n10. Test with various user types (approved, unapproved, admin) to ensure correct behavior\n11. Measure performance improvement by comparing page load times before and after implementation",
+        "status": "done",
+        "dependencies": [
+          3
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze Current AuthContext Implementation",
+            "description": "Analyze the current AuthContext implementation to identify where checkApprovalStatus and admin status checks are being called, and determine the optimal approach for caching these values.",
+            "dependencies": [],
+            "details": "1. Review the AuthContext.js file to identify all instances where approval status and admin status are being checked\n2. Document the current flow of authentication state management\n3. Identify components that depend on these status checks\n4. Determine which values need to be cached (userId, isApproved, isAdmin, etc.)\n5. Create a plan for implementing the storage mechanism",
+            "status": "done",
+            "testStrategy": "Create a flowchart documenting the current authentication flow and identify all points where status checks occur"
+          },
+          {
+            "id": 2,
+            "title": "Implement Authentication State Storage",
+            "description": "Create a mechanism to store authentication state including approval and admin status in localStorage or sessionStorage after initial verification.",
+            "dependencies": [],
+            "details": "1. Define a data structure for storing auth state (userId, isApproved, isAdmin, timestamp)\n2. Create utility functions for reading/writing auth state to localStorage\n3. Implement encryption or obfuscation if needed for sensitive data\n4. Add timestamp for potential expiration checks\n5. Create functions to validate stored data integrity",
+            "status": "done",
+            "testStrategy": "Write unit tests for the storage utility functions to ensure they correctly store and retrieve authentication state"
+          },
+          {
+            "id": 3,
+            "title": "Update Authentication Flow for Login/Logout",
+            "description": "Modify the login and logout processes to properly manage the cached authentication state.",
+            "dependencies": [],
+            "details": "1. Update the login function to fetch approval/admin status after successful authentication\n2. Store the complete auth state in localStorage after login\n3. Modify the logout function to clear all stored auth state\n4. Implement proper error handling for failed status checks\n5. Add logging for authentication state changes",
+            "status": "done",
+            "testStrategy": "Test login and logout flows to ensure proper storage and clearing of authentication state"
+          },
+          {
+            "id": 4,
+            "title": "Implement Page Reload State Recovery",
+            "description": "Create a mechanism to recover authentication state from storage on page reload instead of making API calls.",
+            "dependencies": [],
+            "details": "1. Add initialization logic in AuthContext to check for stored auth state on mount\n2. Implement validation of stored state (check timestamp, data integrity)\n3. Create a fallback mechanism to re-fetch status if storage is invalid or expired\n4. Update the context provider to use cached values when available\n5. Add state to track whether values are from cache or freshly fetched",
+            "status": "done",
+            "testStrategy": "Test page reloads in various authentication states to ensure proper recovery of state without unnecessary API calls"
+          },
+          {
+            "id": 5,
+            "title": "Add Force Refresh Mechanism",
+            "description": "Implement a function to force refresh of authentication status when needed, such as after admin actions or based on timestamp expiration.",
+            "dependencies": [],
+            "details": "1. Create a refreshAuthState function in AuthContext\n2. Implement logic to check timestamp and force refresh after a certain period (e.g., 24 hours)\n3. Add the function to the context so it can be called from components\n4. Identify key user actions that should trigger a refresh (e.g., profile updates)\n5. Implement proper error handling and loading states during refresh",
+            "status": "done",
+            "testStrategy": "Test the force refresh function to ensure it correctly updates the cached state and handles API errors appropriately"
+          },
+          {
+            "id": 6,
+            "title": "Update Protected Routes and Documentation",
+            "description": "Update protected routes to use the cached status values and add comprehensive documentation for the new authentication state management approach.",
+            "dependencies": [],
+            "details": "1. Modify ProtectedRoute components to use cached approval/admin status\n2. Update useAuth hook to expose cached values and the refresh function\n3. Add clear comments throughout the authentication code\n4. Create documentation explaining the authentication state management approach\n5. Add examples of proper usage in components\n6. Document potential edge cases and their handling",
+            "status": "done",
+            "testStrategy": "Test protected routes with various authentication states to ensure they correctly allow or deny access based on cached values"
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Implement Query Cache Management System",
+        "description": "Fix the issue where user queries are fetched from API on every tab switch, page reload, or component mount by implementing a robust client-side query state management system.",
+        "details": "1. Analyze the current QueryCacheContext implementation to identify why components are bypassing it\n2. Enhance the QueryCacheContext to:\n   - Store query data in both context state and localStorage/sessionStorage for persistence\n   - Implement a versioning mechanism to detect stale cache data\n   - Add cache invalidation logic for explicit refresh requests\n3. Modify query fetching logic:\n   - Create a useQueries hook that leverages the enhanced QueryCacheContext\n   - Implement a fetch-once-per-session strategy with cache validation\n   - Add incremental state updates for new/modified/deleted queries\n4. Update components to use the new query management system:\n   - Replace direct API calls to /api/queries with the useQueries hook\n   - Add loading states for initial query fetch\n   - Implement optimistic updates for query modifications\n5. Add cache debugging tools:\n   - Create a cache status indicator in development mode\n   - Add cache reset functionality for testing\n   - Implement detailed cache logging\n6. Optimize performance:\n   - Add debouncing for rapid component mounts\n   - Implement pagination support in the cache\n   - Add query filtering/sorting at the cache level to avoid re-processing\n7. Handle edge cases:\n   - Implement error recovery if cache becomes corrupted\n   - Add fallback to API if cache access fails\n   - Create cache warming on initial app load",
+        "testStrategy": "1. Verify network requests to /api/queries are only made once per session by:\n   - Using browser network inspector to monitor API calls\n   - Testing tab switching, page reloads, and component remounts\n   - Confirming subsequent navigation does not trigger redundant API calls\n2. Test cache persistence by:\n   - Closing and reopening the browser\n   - Verifying query data is loaded from cache without API calls\n   - Confirming localStorage/sessionStorage contains expected query data\n3. Verify incremental updates by:\n   - Creating a new query and confirming only the new query is fetched\n   - Deleting a query and verifying the cache updates correctly\n   - Modifying a query and checking that only the changed query is refreshed\n4. Test cache invalidation by:\n   - Manually triggering a refresh and confirming API calls are made\n   - Simulating cache version mismatch and verifying automatic refresh\n   - Testing forced refresh functionality\n5. Verify performance improvements by:\n   - Measuring and comparing component render times before and after implementation\n   - Testing with large query sets to ensure pagination works correctly\n   - Confirming UI responsiveness during query operations\n6. Test error handling by:\n   - Simulating corrupted cache data\n   - Testing with localStorage disabled\n   - Verifying fallback to API calls works correctly",
+        "status": "pending",
+        "dependencies": [
+          12,
+          16
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze and Refactor QueryCacheContext",
+            "description": "Analyze the current QueryCacheContext implementation to identify why components are bypassing it and refactor it to properly store and manage query data.",
+            "dependencies": [],
+            "details": "1. Review the current QueryCacheContext implementation\n2. Identify patterns where components bypass the cache\n3. Refactor the context to use a reducer pattern for better state management\n4. Implement a clear interface for components to interact with the cache\n5. Document the expected usage patterns for the refactored context",
+            "status": "done",
+            "testStrategy": "Create unit tests for the context provider to verify state updates and cache retrieval functionality"
+          },
+          {
+            "id": 2,
+            "title": "Implement Persistent Storage Integration",
+            "description": "Enhance the QueryCacheContext to store query data in both context state and localStorage/sessionStorage for persistence across page reloads.",
+            "dependencies": [
+              1
+            ],
+            "details": "1. Add localStorage/sessionStorage integration to the QueryCacheContext\n2. Implement serialization/deserialization of query data\n3. Add cache initialization from storage on context mount\n4. Create a configurable storage strategy (memory-only, localStorage, or sessionStorage)\n5. Handle storage quota limitations and fallback gracefully",
+            "status": "done",
+            "testStrategy": "Test persistence by simulating page reloads and verifying data is properly retrieved from storage"
+          },
+          {
+            "id": 3,
+            "title": "Develop Cache Versioning and Invalidation",
+            "description": "Implement a versioning mechanism to detect stale cache data and add cache invalidation logic for explicit refresh requests.",
+            "dependencies": [
+              2
+            ],
+            "details": "1. Add timestamp and version metadata to cached queries\n2. Implement configurable TTL (time-to-live) for cached queries\n3. Create invalidation methods (invalidateQuery, invalidateAll)\n4. Add selective refresh functionality for specific queries\n5. Implement background validation to check if cache is stale",
+            "status": "done",
+            "testStrategy": "Test cache invalidation by manipulating timestamps and versions, then verifying proper refresh behavior"
+          },
+          {
+            "id": 4,
+            "title": "Create useQueries Custom Hook",
+            "description": "Develop a useQueries hook that leverages the enhanced QueryCacheContext to implement a fetch-once-per-session strategy with cache validation.",
+            "dependencies": [
+              3
+            ],
+            "details": "1. Create a useQueries hook that interfaces with QueryCacheContext\n2. Implement query fetching logic with cache-first approach\n3. Add support for forced refresh option\n4. Handle loading, error, and success states\n5. Implement incremental state updates for modified queries\n6. Add support for query parameters and filtering",
+            "status": "done",
+            "testStrategy": "Create component tests that use the hook and verify proper caching behavior across multiple renders"
+          },
+          {
+            "id": 5,
+            "title": "Update Components to Use Cache System",
+            "description": "Refactor components to use the new query management system instead of direct API calls, adding loading states and optimistic updates.",
+            "dependencies": [
+              4
+            ],
+            "details": "1. Identify all components making direct API calls to /api/queries\n2. Replace direct API calls with useQueries hook\n3. Implement loading states for initial query fetch\n4. Add optimistic updates for query modifications\n5. Update components to handle cache misses gracefully",
+            "status": "done",
+            "testStrategy": "Create integration tests that verify components properly use the cache and display correct loading states"
+          },
+          {
+            "id": 6,
+            "title": "Implement Performance Optimizations",
+            "description": "Optimize cache performance by adding debouncing, pagination support, and query filtering/sorting at the cache level.",
+            "dependencies": [
+              5
+            ],
+            "details": "1. Add debouncing for rapid component mounts to prevent cache thrashing\n2. Implement pagination support in the cache to handle large query sets\n3. Add query filtering/sorting at the cache level\n4. Optimize cache lookup performance with indexing\n5. Implement batched updates to reduce re-renders",
+            "status": "done",
+            "testStrategy": "Perform performance testing with large datasets to verify optimizations are effective"
+          },
+          {
+            "id": 7,
+            "title": "Add Cache Debugging and Error Handling",
+            "description": "Implement cache debugging tools, error recovery mechanisms, and edge case handling to ensure robustness.",
+            "dependencies": [
+              6
+            ],
+            "details": "1. Create a cache status indicator component for development mode\n2. Add cache reset functionality for testing\n3. Implement detailed cache logging (configurable verbosity)\n4. Add error recovery if cache becomes corrupted\n5. Implement fallback to API if cache access fails\n6. Create cache warming functionality on initial app load\n7. Add cache statistics for monitoring performance",
+            "status": "in-progress",
+            "testStrategy": "Test error scenarios by deliberately corrupting cache data and verifying recovery mechanisms work properly"
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Enhance Query Cache Implementation with Advanced Caching Strategies",
+        "description": "Improve the existing QueryCacheContext to extend cache duration, implement selective invalidation, add cross-tab persistence, enable background refresh for stale data, and ensure proper cache utilization in query components.",
+        "details": "1. Analyze current QueryCacheContext implementation:\n   - Review the existing 5-minute cache duration mechanism\n   - Identify components that bypass the cache\n   - Map query patterns and frequency of API calls\n\n2. Extend cache duration to session-based:\n   - Modify cache configuration to maintain validity for the entire user session\n   - Implement cache expiration tied to session timeout or explicit logout\n   - Add configurable TTL (Time-To-Live) settings per query type\n\n3. Implement selective cache invalidation:\n   - Create a dependency tracking system to identify related queries\n   - Develop a tagging system to categorize queries by data domain\n   - Implement invalidation functions that target specific query types or tags\n   - Add mutation tracking to automatically invalidate affected queries\n\n4. Add cache persistence across browser tabs:\n   - Implement localStorage/sessionStorage integration for cache data\n   - Create a versioning system to handle concurrent modifications\n   - Add cross-tab communication using BroadcastChannel API or localStorage events\n   - Implement cache synchronization when tabs detect changes\n\n5. Implement background refresh for stale data:\n   - Create a background worker to refresh near-expiring cache entries\n   - Implement stale-while-revalidate pattern to serve cached data while updating\n   - Add priority queue for refresh operations based on usage patterns\n   - Implement exponential backoff for failed refresh attempts\n\n6. Ensure proper cache utilization in query components:\n   - Create or update useQuery hook to leverage enhanced cache\n   - Add cache status indicators (fresh, stale, fetching) to components\n   - Implement forced refresh options for user-initiated updates\n   - Add debugging tools to monitor cache hit/miss rates\n\n7. Optimize cache storage:\n   - Implement compression for large cached responses\n   - Add size limits and LRU (Least Recently Used) eviction policies\n   - Create cache pruning mechanisms for outdated or rarely accessed data\n\n8. Add cache analytics and monitoring:\n   - Implement cache performance metrics (hit rate, size, invalidations)\n   - Create developer tools for cache inspection and manual management\n   - Add logging for cache operations to aid debugging",
+        "testStrategy": "1. Cache Duration Tests:\n   - Verify cached data persists throughout user session\n   - Test that cache survives page refreshes and navigation\n   - Confirm cache expires appropriately on session timeout or logout\n\n2. Selective Invalidation Tests:\n   - Create test scenarios with interdependent queries\n   - Verify that modifying data invalidates only related queries\n   - Test tag-based invalidation affects all queries with matching tags\n   - Confirm unrelated queries remain cached after invalidations\n\n3. Cross-Tab Persistence Tests:\n   - Open multiple browser tabs and verify cache sharing\n   - Test cache updates propagate across tabs\n   - Verify concurrent modifications resolve correctly\n   - Test edge cases like tab disconnection and reconnection\n\n4. Background Refresh Tests:\n   - Verify stale data is served while refresh occurs in background\n   - Test refresh priority queue handles high-demand scenarios\n   - Confirm exponential backoff works for failed refresh attempts\n   - Measure performance impact of background operations\n\n5. Component Integration Tests:\n   - Verify components correctly utilize the cache\n   - Test cache status indicators reflect actual cache state\n   - Confirm forced refresh options work as expected\n   - Verify components don't trigger unnecessary API calls\n\n6. Performance Tests:\n   - Measure reduction in API calls compared to previous implementation\n   - Test cache performance with large datasets\n   - Verify compression reduces storage requirements\n   - Test LRU eviction policy correctly removes least used items\n\n7. End-to-End Tests:\n   - Create user flows that exercise the cache system\n   - Verify application functions correctly with enhanced caching\n   - Test cache behavior during poor network conditions\n   - Confirm cache analytics provide accurate metrics\n\n8. Regression Tests:\n   - Verify all existing functionality works with new cache implementation\n   - Test backward compatibility with components not yet updated",
+        "status": "pending",
+        "dependencies": [
+          12,
+          17
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 19,
+        "title": "Implement API Rate Limiting Protection",
+        "description": "Add safeguards against excessive API calls that may hit rate limits or cause performance issues, including request deduplication, retry logic, batching, and usage monitoring.",
+        "details": "1. Implement request deduplication mechanism:\n   - Create a request fingerprinting system based on endpoint, parameters, and timestamp\n   - Develop a pending request registry to track in-flight API calls\n   - Add logic to return cached promises for duplicate requests within a configurable time window\n   - Implement cleanup for completed request entries\n\n2. Add retry logic with exponential backoff:\n   - Create a configurable retry policy with maximum attempts and backoff factors\n   - Implement error detection to identify retryable vs. non-retryable errors\n   - Add exponential backoff calculation with jitter to prevent thundering herd problems\n   - Develop timeout handling for long-running retries\n   - Create circuit breaker pattern to prevent repeated failures\n\n3. Implement request batching:\n   - Identify API endpoints suitable for batching\n   - Create request queue system with configurable batch size and timing\n   - Develop batch processor to combine similar requests\n   - Implement response demultiplexer to route batched responses back to original requesters\n   - Add priority handling for urgent requests that shouldn't wait for batching\n\n4. Add API usage monitoring and logging:\n   - Create detailed logging for all API requests, responses, and errors\n   - Implement metrics collection for request frequency, latency, and error rates\n   - Develop dashboard for visualizing API usage patterns\n   - Add alerting for approaching rate limits or unusual patterns\n   - Create rate limit tracking to proactively slow requests before hitting limits\n\n5. Implement adaptive throttling:\n   - Develop token bucket algorithm for client-side rate limiting\n   - Create adaptive throttling based on server response headers\n   - Implement priority queuing for critical vs. non-critical requests\n   - Add configurable concurrency limits for parallel requests\n\n6. Enhance the existing OpenFDA API client:\n   - Integrate the new rate limiting protections with the existing API client\n   - Update error handling to work with new retry mechanisms\n   - Modify caching strategy to work with deduplication system\n   - Add instrumentation for monitoring and metrics",
+        "testStrategy": "1. Test request deduplication:\n   - Create unit tests with simultaneous identical API calls\n   - Verify only one network request is made for duplicate calls\n   - Test edge cases with nearly identical requests\n   - Verify correct response is returned to all callers\n   - Measure performance impact of deduplication mechanism\n\n2. Test retry logic:\n   - Mock API failures to trigger retry mechanism\n   - Verify exponential backoff increases wait time between retries\n   - Test maximum retry limit enforcement\n   - Verify successful retry after temporary failure\n   - Test circuit breaker prevents excessive retries\n\n3. Test request batching:\n   - Create scenarios with multiple similar requests\n   - Verify requests are combined into appropriate batches\n   - Test timing of batch processing\n   - Verify correct responses are routed back to original requesters\n   - Measure performance improvements from batching\n\n4. Test monitoring and logging:\n   - Verify all API calls are properly logged\n   - Test metrics collection accuracy\n   - Verify dashboard displays correct usage patterns\n   - Test alerting triggers with simulated high usage\n   - Verify rate limit tracking accurately predicts limits\n\n5. Test adaptive throttling:\n   - Simulate rate limit responses from server\n   - Verify client-side throttling activates appropriately\n   - Test priority queuing with mixed critical and non-critical requests\n   - Verify concurrency limits are enforced\n   - Measure system behavior under high load conditions\n\n6. Integration testing:\n   - Test the complete system with real API endpoints\n   - Verify all protection mechanisms work together\n   - Measure overall performance impact\n   - Test with various network conditions and latencies\n   - Verify system resilience during API outages or degraded performance",
+        "status": "pending",
+        "dependencies": [
+          6,
+          12,
+          14
+        ],
+        "priority": "medium",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-07-12T19:24:40.220Z",
+      "updated": "2025-07-13T09:51:44.651Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

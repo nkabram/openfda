@@ -1,0 +1,96 @@
+# Task ID: 18
+# Title: Enhance Query Cache Implementation with Advanced Caching Strategies
+# Status: pending
+# Dependencies: 12, 17
+# Priority: medium
+# Description: Improve the existing QueryCacheContext to extend cache duration, implement selective invalidation, add cross-tab persistence, enable background refresh for stale data, and ensure proper cache utilization in query components.
+# Details:
+1. Analyze current QueryCacheContext implementation:
+   - Review the existing 5-minute cache duration mechanism
+   - Identify components that bypass the cache
+   - Map query patterns and frequency of API calls
+
+2. Extend cache duration to session-based:
+   - Modify cache configuration to maintain validity for the entire user session
+   - Implement cache expiration tied to session timeout or explicit logout
+   - Add configurable TTL (Time-To-Live) settings per query type
+
+3. Implement selective cache invalidation:
+   - Create a dependency tracking system to identify related queries
+   - Develop a tagging system to categorize queries by data domain
+   - Implement invalidation functions that target specific query types or tags
+   - Add mutation tracking to automatically invalidate affected queries
+
+4. Add cache persistence across browser tabs:
+   - Implement localStorage/sessionStorage integration for cache data
+   - Create a versioning system to handle concurrent modifications
+   - Add cross-tab communication using BroadcastChannel API or localStorage events
+   - Implement cache synchronization when tabs detect changes
+
+5. Implement background refresh for stale data:
+   - Create a background worker to refresh near-expiring cache entries
+   - Implement stale-while-revalidate pattern to serve cached data while updating
+   - Add priority queue for refresh operations based on usage patterns
+   - Implement exponential backoff for failed refresh attempts
+
+6. Ensure proper cache utilization in query components:
+   - Create or update useQuery hook to leverage enhanced cache
+   - Add cache status indicators (fresh, stale, fetching) to components
+   - Implement forced refresh options for user-initiated updates
+   - Add debugging tools to monitor cache hit/miss rates
+
+7. Optimize cache storage:
+   - Implement compression for large cached responses
+   - Add size limits and LRU (Least Recently Used) eviction policies
+   - Create cache pruning mechanisms for outdated or rarely accessed data
+
+8. Add cache analytics and monitoring:
+   - Implement cache performance metrics (hit rate, size, invalidations)
+   - Create developer tools for cache inspection and manual management
+   - Add logging for cache operations to aid debugging
+
+# Test Strategy:
+1. Cache Duration Tests:
+   - Verify cached data persists throughout user session
+   - Test that cache survives page refreshes and navigation
+   - Confirm cache expires appropriately on session timeout or logout
+
+2. Selective Invalidation Tests:
+   - Create test scenarios with interdependent queries
+   - Verify that modifying data invalidates only related queries
+   - Test tag-based invalidation affects all queries with matching tags
+   - Confirm unrelated queries remain cached after invalidations
+
+3. Cross-Tab Persistence Tests:
+   - Open multiple browser tabs and verify cache sharing
+   - Test cache updates propagate across tabs
+   - Verify concurrent modifications resolve correctly
+   - Test edge cases like tab disconnection and reconnection
+
+4. Background Refresh Tests:
+   - Verify stale data is served while refresh occurs in background
+   - Test refresh priority queue handles high-demand scenarios
+   - Confirm exponential backoff works for failed refresh attempts
+   - Measure performance impact of background operations
+
+5. Component Integration Tests:
+   - Verify components correctly utilize the cache
+   - Test cache status indicators reflect actual cache state
+   - Confirm forced refresh options work as expected
+   - Verify components don't trigger unnecessary API calls
+
+6. Performance Tests:
+   - Measure reduction in API calls compared to previous implementation
+   - Test cache performance with large datasets
+   - Verify compression reduces storage requirements
+   - Test LRU eviction policy correctly removes least used items
+
+7. End-to-End Tests:
+   - Create user flows that exercise the cache system
+   - Verify application functions correctly with enhanced caching
+   - Test cache behavior during poor network conditions
+   - Confirm cache analytics provide accurate metrics
+
+8. Regression Tests:
+   - Verify all existing functionality works with new cache implementation
+   - Test backward compatibility with components not yet updated

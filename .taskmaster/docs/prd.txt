@@ -1,0 +1,146 @@
+# MedGuardRx - OpenFDA Medication Safety Application
+## Product Requirements Document
+
+### Project Overview
+MedGuardRx is a comprehensive medication safety application that leverages the OpenFDA database to provide AI-powered medication information and safety insights. The application serves as a research tool for healthcare professionals and researchers to access FDA-approved medication data through an intelligent query interface.
+
+### Core Features
+
+#### 1. User Authentication & Authorization System
+- Multi-modal authentication (Google OAuth, email/password)
+- User approval system with auto-approval for trusted domains (*.ah.org, umich.edu)
+- Admin dashboard for user management
+- Role-based access control (regular users vs admins)
+- Email verification and password reset functionality
+
+#### 2. Medication Query System
+- Natural language medication queries
+- Intent detection for targeted FDA data retrieval
+- Support for multiple query types: dosage, ingredients, indications, warnings, adverse reactions
+- Progress indicators for query processing
+- Comprehensive FDA data integration from multiple drug results
+
+#### 3. AI-Powered Response Generation
+- Context-aware responses based on detected user intent
+- Integration with FDA labeling sections
+- Multiple response modes: FDA docs only, web search, LLM general knowledge
+- Follow-up question system with mode selection
+- Citation and source tracking
+
+#### 4. Admin Management System
+- User approval/rejection workflow
+- Query monitoring across all users
+- Auto-approval domain management
+- System analytics and user activity tracking
+- Admin-only query viewing (read-only mode)
+
+#### 5. Data Management & Caching
+- Query history with user isolation
+- Message threading for follow-up conversations
+- Performance optimization through query caching
+- Comprehensive audit trail for all user interactions
+
+#### 6. User Experience & Interface
+- Professional landing page with consent management
+- Responsive design with dark/light theme support
+- Progress indicators and loading states
+- Comprehensive disclaimer and consent modals
+- Intuitive navigation and user feedback
+
+### Technical Architecture
+
+#### Frontend
+- Next.js 14 with TypeScript
+- React components with Tailwind CSS
+- Context-based state management
+- Real-time UI updates and caching
+
+#### Backend
+- Next.js API routes
+- Supabase for authentication and database
+- OpenAI integration for AI responses
+- FDA API integration for medication data
+
+#### Database Schema
+- User profiles and admin management
+- Query storage with message threading
+- RLS (Row Level Security) for data isolation
+- Foreign key relationships for data integrity
+
+### Compliance & Safety
+- FDA clinical decision-making disclaimers
+- OpenFDA terms of service integration
+- User consent management
+- Data privacy and security measures
+- Research ethics compliance
+
+### Target Users
+- Healthcare professionals
+- Medical researchers
+- Academic institutions (University of Michigan focus)
+- Healthcare organizations (Ascension Health system)
+
+### Success Metrics
+- User engagement and query volume
+- Response accuracy and relevance
+- System performance and reliability
+- User satisfaction and feedback
+- Research output and citations
+
+### Performance Optimization Requirements
+
+#### Authentication State Management Issues
+- **Current Problem**: User approval status and admin status checks are performed on every page reload/refresh
+- **Impact**: Unnecessary API calls to `/api/auth/status` endpoint on each application load
+- **Required Solution**: Implement persistent authentication state that only checks status once per session
+- **Technical Details**: 
+  - Store approval/admin status in localStorage or sessionStorage after initial check
+  - Only re-check status on explicit login/logout events
+  - Reduce API calls from multiple per session to one per login
+
+#### Query Data Management Issues
+- **Current Problem**: User queries are fetched from API on every tab switch, page reload, or component mount
+- **Impact**: Excessive API calls to `/api/queries` endpoint causing performance degradation
+- **Required Solution**: Implement robust client-side query state management
+- **Technical Details**:
+  - Maintain queries in persistent state (context/localStorage hybrid)
+  - Only fetch queries once per session unless explicitly refreshed
+  - Update state incrementally for new/deleted queries instead of full refetch
+  - Implement optimistic updates for better user experience
+
+#### Cache Invalidation Strategy
+- **Current Problem**: QueryCacheContext exists but components still make frequent API calls
+- **Required Solution**: Strengthen cache implementation with proper invalidation
+- **Technical Details**:
+  - Extend cache duration from 5 minutes to session-based
+  - Implement selective cache invalidation (only affected queries)
+  - Add cache persistence across browser tabs
+  - Implement background refresh for stale data
+
+#### API Rate Limiting Concerns
+- **Current Problem**: Frequent API calls may hit rate limits or cause performance issues
+- **Required Solution**: Minimize API calls through intelligent caching and state management
+- **Technical Details**:
+  - Batch API requests where possible
+  - Implement request deduplication
+  - Add retry logic with exponential backoff
+  - Monitor and log API usage patterns
+
+### Future Enhancements
+- Advanced analytics and reporting
+- Integration with additional medical databases
+- Mobile application development
+- API access for third-party integrations
+- Machine learning model improvements
+- Real-time query collaboration features
+- Advanced caching strategies (Redis/CDN integration)
+- Progressive Web App (PWA) capabilities
+
+### Deployment & Infrastructure
+- Vercel hosting for frontend
+- Supabase cloud for backend services
+- Environment-specific configurations
+- Monitoring and logging systems
+- Automated deployment pipelines
+- Performance monitoring and alerting
+- CDN integration for static assets

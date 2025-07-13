@@ -4,6 +4,18 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
+// Constants for localStorage keys and cache duration
+const AUTH_CACHE_KEY = 'medguard_auth_cache'
+const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+
+// Interface for cached authentication data
+interface AuthCache {
+  isApproved: boolean
+  isAdmin: boolean
+  userId: string
+  timestamp: number
+  version: number // For future cache invalidation if needed
+}
 
 interface AuthContextType {
   user: User | null
@@ -18,6 +30,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   checkApprovalStatus: () => void
+  refreshAuthState: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -30,12 +43,102 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isApproved, setIsApproved] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(true)
+  const [authCacheLoaded, setAuthCacheLoaded] = useState(false)
   useEffect(() => {
     setIsClient(true)
   }, [])
 
-  const checkApprovalStatus = useCallback(async (currentSession: Session) => {
-    console.log('🔍 Checking approval status for user:', currentSession.user?.email)
+  // Utility functions for localStorage operations with error handling
+  const getAuthCache = useCallback((): AuthCache | null => {
+    if (typeof window === 'undefined') return null
+    
+    try {
+      const cached = localStorage.getItem(AUTH_CACHE_KEY)
+      if (!cached) return null
+      
+      const parsed: AuthCache = JSON.parse(cached)
+      
+      // Check if cache is expired
+      if (Date.now() - parsed.timestamp > CACHE_DURATION) {
+        console.log('🕒 Auth cache expired, removing...')
+        localStorage.removeItem(AUTH_CACHE_KEY)
+        return null
+      }
+      
+      return parsed
+    } catch (error) {
+      console.error('❌ Error reading auth cache:', error)
+      // Clear corrupted cache
+      try {
+        localStorage.removeItem(AUTH_CACHE_KEY)
+      } catch (e) {
+        console.error('❌ Error clearing corrupted cache:', e)
+      }
+      return null
+    }
+  }, [])
+
+  const setAuthCache = useCallback((isApproved: boolean, isAdmin: boolean, userId: string) => {
+    if (typeof window === 'undefined') return
+    
+    try {
+      const cacheData: AuthCache = {
+        isApproved,
+        isAdmin,
+        userId,
+        timestamp: Date.now(),
+        version: 1
+      }
+      
+      localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(cacheData))
+      console.log('💾 Auth cache saved:', { isApproved, isAdmin, userId })
+    } catch (error) {
+      console.error('❌ Error saving auth cache:', error)
+    }
+  }, [])
+
+  const clearAuthCache = useCallback(() => {
+    if (typeof window === 'undefined') return
+    
+    try {
+      localStorage.removeItem(AUTH_CACHE_KEY)
+      console.log('🗑️ Auth cache cleared')
+    } catch (error) {
+      console.error('❌ Error clearing auth cache:', error)
+    }
+  }, [])
+
+  // Load cached auth state on client initialization
+  const loadCachedAuthState = useCallback((currentUser: User | null) => {
+    if (!currentUser || authCacheLoaded) return false
+    
+    const cached = getAuthCache()
+    if (!cached) return false
+    
+    // Verify cache is for the current user
+    if (cached.userId !== currentUser.id) {
+      console.log('👤 Cache user mismatch, clearing cache')
+      clearAuthCache()
+      return false
+    }
+    
+    console.log('📋 Loading cached auth state:', { isApproved: cached.isApproved, isAdmin: cached.isAdmin })
+    setIsApproved(cached.isApproved)
+    setIsAdmin(cached.isAdmin)
+    setApprovalLoading(false)
+    setAuthCacheLoaded(true)
+    
+    return true
+  }, [getAuthCache, clearAuthCache, authCacheLoaded])
+
+  const checkApprovalStatus = useCallback(async (currentSession: Session, forceRefresh = false) => {
+    console.log('🔍 Checking approval status for user:', currentSession.user?.email, { forceRefresh })
+
+    // If not forcing refresh, try to use cached data first
+    if (!forceRefresh && loadCachedAuthState(currentSession.user)) {
+      console.log('✅ Using cached auth state, skipping API call')
+      return
+    }
 
     setApprovalLoading(true)
     
@@ -53,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('❌ Status API error:', response.status, response.statusText)
         setIsApproved(false)
         setIsAdmin(false)
+        // Don't cache failed responses
         return
       }
 
@@ -61,15 +165,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setIsApproved(data.isApproved)
       setIsAdmin(data.isAdmin)
+      
+      // Cache the successful response
+      setAuthCache(data.isApproved, data.isAdmin, currentSession.user.id)
+      setAuthCacheLoaded(true)
     } catch (error) {
       console.error('❌ Error checking approval status:', error)
       setIsApproved(false)
       setIsAdmin(false)
+      // Don't cache error states
     } finally {
       console.log('🏁 Setting approvalLoading to false')
       setApprovalLoading(false)
     }
-  }, [])
+  }, [loadCachedAuthState, setAuthCache])
+
+  // Force refresh function for manual cache invalidation
+  const refreshAuthState = useCallback(async () => {
+    if (!session) {
+      console.log('⚠️ No session available for refresh')
+      return
+    }
+    
+    console.log('🔄 Force refreshing auth state...')
+    clearAuthCache()
+    setAuthCacheLoaded(false)
+    await checkApprovalStatus(session, true)
+  }, [session, clearAuthCache, checkApprovalStatus])
 
   useEffect(() => {
     if (!isClient) return
@@ -112,7 +234,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isClient,
       currentApprovalLoading: approvalLoading,
       currentIsApproved: isApproved,
-      currentIsAdmin: isAdmin
+      currentIsAdmin: isAdmin,
+      authCacheLoaded
     })
     
     // Only proceed if client-side
@@ -130,8 +253,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsApproved(false)
       setIsAdmin(false)
       setApprovalLoading(false)
+      setAuthCacheLoaded(false)
+      // Clear cache when user logs out
+      clearAuthCache()
     }
-  }, [session, user, isClient]) // Remove checkApprovalStatus from deps to avoid infinite loop
+  }, [session, user, isClient, clearAuthCache]) // Remove checkApprovalStatus from deps to avoid infinite loop
 
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -176,6 +302,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    // Clear auth cache before signing out
+    clearAuthCache()
+    setAuthCacheLoaded(false)
+    
     // Sign out from Supabase
     await supabase.auth.signOut()
     
@@ -214,6 +344,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkApprovalStatus: () => {
       if (session) checkApprovalStatus(session)
     },
+    refreshAuthState,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

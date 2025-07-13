@@ -8,7 +8,7 @@ import { ScrollArea } from './ui/scroll-area'
 import { Separator } from './ui/separator'
 import { Clock, User, Pill, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useQueryCache } from '@/contexts/QueryCacheContext'
+import { useAdminQueries } from '@/hooks/useQueries'
 
 interface QueryWithUser {
   id: string
@@ -16,7 +16,7 @@ interface QueryWithUser {
   medication_name: string
   ai_response: string
   created_at: string
-  message_count: number
+  message_count?: number
   profiles?: {
     email: string
     full_name: string
@@ -32,43 +32,24 @@ interface AdminQueryHistoryProps {
 }
 
 export function AdminQueryHistory({ onCreatePersonalQuery, selectedQuery, onSelectQuery }: AdminQueryHistoryProps) {
-  const [loading, setLoading] = useState(false)
   const { session } = useAuth()
-  const { cache, setAdminQueries, shouldRefetch } = useQueryCache()
-
-  // Use cached admin queries
-  const queries = cache.adminQueries as QueryWithUser[]
-
-  const fetchQueries = useCallback(async (forceRefresh = false) => {
-    // Only fetch if cache is stale or forced
-    if (!forceRefresh && !shouldRefetch('admin')) {
-      return
+  const {
+    queries,
+    loading: isLoading,
+    error,
+    refetch,
+  } = useAdminQueries({
+    onError: (error) => {
+      console.error('Failed to fetch admin queries:', error)
     }
+  })
 
-    setLoading(true)
-    try {
-      const response = await fetch('/api/queries?view=admin', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setAdminQueries(data.queries || [])
-      } else {
-        console.error('Failed to fetch admin queries')
-      }
-    } catch (error) {
-      console.error('Error fetching admin queries:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [session?.access_token, shouldRefetch, setAdminQueries])
-
+  // Handle error display
   useEffect(() => {
-    fetchQueries()
-  }, [fetchQueries])
+    if (error) {
+      console.error('Admin query history error:', error)
+    }
+  }, [error])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -89,7 +70,7 @@ export function AdminQueryHistory({ onCreatePersonalQuery, selectedQuery, onSele
     return 'Unknown User'
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Card className="h-full">
         <CardHeader>
@@ -174,7 +155,7 @@ export function AdminQueryHistory({ onCreatePersonalQuery, selectedQuery, onSele
                           <Clock className="h-3 w-3" />
                           <span>{formatDate(query.created_at)}</span>
                         </div>
-                        {query.message_count > 0 && (
+                        {query.message_count && query.message_count > 0 && (
                           <Badge variant="secondary" className="text-xs">
                             {query.message_count} follow-ups
                           </Badge>

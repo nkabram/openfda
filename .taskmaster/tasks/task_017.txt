@@ -1,0 +1,58 @@
+# Task ID: 17
+# Title: Implement Query Cache Management System
+# Status: pending
+# Dependencies: 12, 16
+# Priority: high
+# Description: Fix the issue where user queries are fetched from API on every tab switch, page reload, or component mount by implementing a robust client-side query state management system.
+# Details:
+1. Analyze the current QueryCacheContext implementation to identify why components are bypassing it
+2. Enhance the QueryCacheContext to:
+   - Store query data in both context state and localStorage/sessionStorage for persistence
+   - Implement a versioning mechanism to detect stale cache data
+   - Add cache invalidation logic for explicit refresh requests
+3. Modify query fetching logic:
+   - Create a useQueries hook that leverages the enhanced QueryCacheContext
+   - Implement a fetch-once-per-session strategy with cache validation
+   - Add incremental state updates for new/modified/deleted queries
+4. Update components to use the new query management system:
+   - Replace direct API calls to /api/queries with the useQueries hook
+   - Add loading states for initial query fetch
+   - Implement optimistic updates for query modifications
+5. Add cache debugging tools:
+   - Create a cache status indicator in development mode
+   - Add cache reset functionality for testing
+   - Implement detailed cache logging
+6. Optimize performance:
+   - Add debouncing for rapid component mounts
+   - Implement pagination support in the cache
+   - Add query filtering/sorting at the cache level to avoid re-processing
+7. Handle edge cases:
+   - Implement error recovery if cache becomes corrupted
+   - Add fallback to API if cache access fails
+   - Create cache warming on initial app load
+
+# Test Strategy:
+1. Verify network requests to /api/queries are only made once per session by:
+   - Using browser network inspector to monitor API calls
+   - Testing tab switching, page reloads, and component remounts
+   - Confirming subsequent navigation does not trigger redundant API calls
+2. Test cache persistence by:
+   - Closing and reopening the browser
+   - Verifying query data is loaded from cache without API calls
+   - Confirming localStorage/sessionStorage contains expected query data
+3. Verify incremental updates by:
+   - Creating a new query and confirming only the new query is fetched
+   - Deleting a query and verifying the cache updates correctly
+   - Modifying a query and checking that only the changed query is refreshed
+4. Test cache invalidation by:
+   - Manually triggering a refresh and confirming API calls are made
+   - Simulating cache version mismatch and verifying automatic refresh
+   - Testing forced refresh functionality
+5. Verify performance improvements by:
+   - Measuring and comparing component render times before and after implementation
+   - Testing with large query sets to ensure pagination works correctly
+   - Confirming UI responsiveness during query operations
+6. Test error handling by:
+   - Simulating corrupted cache data
+   - Testing with localStorage disabled
+   - Verifying fallback to API calls works correctly
