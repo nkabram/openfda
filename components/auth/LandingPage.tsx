@@ -1,18 +1,12 @@
 'use client'
 
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Shield, Zap, Database, Users, CheckCircle, AlertTriangle } from 'lucide-react'
-import { AuthScreen } from './AuthScreen'
 import { ThemeToggle } from '@/components/theme-toggle'
+import Link from 'next/link'
 
 export function LandingPage() {
-  const [showAuthScreen, setShowAuthScreen] = useState(false)
-
-  if (showAuthScreen) {
-    return <AuthScreen />
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -25,9 +19,14 @@ export function LandingPage() {
           </div>
           <div className="flex items-center space-x-4">
             <ThemeToggle />
-            <Button onClick={() => setShowAuthScreen(true)} className="bg-blue-600 hover:bg-blue-700">
-              Sign In / Sign Up
-            </Button>
+            <Link href="/signin" className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white font-medium transition-colors">
+              Login
+            </Link>
+            <Link href="/signup">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                Sign Up
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
@@ -43,13 +42,14 @@ export function LandingPage() {
               MedGuardRx uses advanced AI models to answer medication-related clinical questions in real time, 
               helping improve the quality and safety of clinical decision-making.
             </p>
-            <Button 
-              onClick={() => setShowAuthScreen(true)} 
-              size="lg" 
-              className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
-            >
-              Get Started
-            </Button>
+            <Link href="/signup">
+              <Button 
+                size="lg" 
+                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
+              >
+                Get Started
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -222,13 +222,14 @@ export function LandingPage() {
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
             Join our research initiative and help improve medication safety through AI.
           </p>
-          <Button 
-            onClick={() => setShowAuthScreen(true)} 
-            size="lg" 
-            className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
-          >
-            Sign Up Now
-          </Button>
+          <Link href="/signup">
+            <Button 
+              size="lg" 
+              className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
+            >
+              Sign Up Now
+            </Button>
+          </Link>
         </div>
       </section>
 

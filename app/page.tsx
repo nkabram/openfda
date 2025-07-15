@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { MedicationQueryForm } from '../components/medication-query-form'
 import { QueryHistory } from '../components/query-history'
-import { AdminQueryHistory } from '../components/admin-query-history'
 import { AuthWrapper } from '../components/auth/AuthWrapper'
 import { DisclaimerModal } from '../components/disclaimer-modal'
 import { ProjectConsentModal } from '../components/ProjectConsentModal'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
-import { PanelLeft, PanelLeftOpen, Plus, User, Users, Settings } from 'lucide-react'
+import { Input } from '../components/ui/input'
+import { PanelLeft, PanelLeftOpen, Plus, User, Users, Settings, Search } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useQueryCache } from '@/contexts/QueryCacheContext'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -30,15 +30,15 @@ const AuthGuard = dynamic(() => import('../components/auth/AuthGuard').then(mod 
 })
 
 export default function Home() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false) // Default closed on mobile
-  const [queryRefreshTrigger, setQueryRefreshTrigger] = useState(0)
-  const [selectedQuery, setSelectedQuery] = useState<any>(null)
-  const [newQueryTrigger, setNewQueryTrigger] = useState(0)
-  const [viewMode, setViewMode] = useState<'user' | 'admin'>('user')
-  const [showCacheDebugger, setShowCacheDebugger] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [selectedQuery, setSelectedQuery] = useState<any>(null)
+  const [queryRefreshTrigger, setQueryRefreshTrigger] = useState(0)
+  const [newQueryTrigger, setNewQueryTrigger] = useState(0)
+  const [drugSearchFilter, setDrugSearchFilter] = useState('')
+  const [sidebarWidth, setSidebarWidth] = useState(320)
+  const [isResizing, setIsResizing] = useState(false)
   const { isAdmin } = useAuth()
-  const { invalidateUserQueries, invalidateAdminQueries } = useQueryCache()
   
   // Show cache debugger in development mode
   const isDevelopment = process.env.NODE_ENV === 'development'
@@ -88,9 +88,6 @@ export default function Home() {
   }
 
   const handleQuerySaved = () => {
-    // Invalidate cache to force refresh
-    invalidateUserQueries()
-    invalidateAdminQueries()
     // Trigger a refresh of the query history
     setQueryRefreshTrigger(prev => prev + 1)
   }
@@ -104,16 +101,40 @@ export default function Home() {
     setSelectedQuery(query)
   }
 
-  const handleCreatePersonalQuery = () => {
-    setViewMode('user')
-    setSelectedQuery(null)
-    setNewQueryTrigger(prev => prev + 1)
+  // Resize handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
   }
 
-  const toggleViewMode = () => {
-    setViewMode(prev => prev === 'user' ? 'admin' : 'user')
-    setSelectedQuery(null)
-  }
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return
+      
+      const newWidth = e.clientX
+      if (newWidth >= 250 && newWidth <= 600) {
+        setSidebarWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
 
   return (
     <>
@@ -130,78 +151,90 @@ export default function Home() {
           <div className="flex">
             {/* Sidebar */}
             <div className={`
-              ${isMobile ? 'fixed left-0 top-0 h-full z-50 w-80' : 'relative'}
-              ${!isMobile ? (isSidebarOpen ? 'w-80' : 'w-0') : ''} 
-              transition-all duration-300 ease-in-out overflow-hidden 
-              bg-background border-r border-border
+              transition-all duration-300 ease-in-out
+              bg-background border-r border-border relative
+              ${isMobile 
+                ? `fixed left-0 top-0 h-full z-50 transform ${
+                    isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                  }` 
+                : `${isSidebarOpen ? '' : 'w-0'} overflow-hidden`
+              }
               ${isSidebarOpen ? 'shadow-lg' : ''}
-              ${isMobile ? (isSidebarOpen ? 'translate-x-0' : '-translate-x-full') : ''}
-            `}>
-            <div className="h-full">
-              <div className="p-4 border-b border-border">
+            `}
+            style={{
+              width: isMobile ? '320px' : (isSidebarOpen ? `${sidebarWidth}px` : '0px')
+            }}>
+            <div className="h-full flex flex-col">
+              {/* Header with collapse button and search */}
+              <div className="p-3 border-b border-border bg-muted/30">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold">
-                      {viewMode === 'admin' ? 'All Queries' : 'My Queries'}
-                    </h2>
-                    {viewMode === 'admin' && (
-                      <Badge variant="secondary" className="text-xs">
-                        Admin View
-                      </Badge>
-                    )}
-                  </div>
+                  <h2 className="text-sm font-semibold text-foreground">Query History</h2>
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onClick={() => toggleSidebar(false)}
                     title="Collapse sidebar"
-                    className="hover:bg-muted transition-colors"
+                    className="h-7 w-7 p-0 hover:bg-muted transition-colors"
                   >
-                    <PanelLeft className="h-4 w-4" />
+                    <PanelLeft className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                {isAdmin && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleViewMode}
-                    className="w-full flex items-center gap-2"
-                  >
-                    {viewMode === 'user' ? (
-                      <>
-                        <Users className="h-4 w-4" />
-                        View All Queries
-                      </>
-                    ) : (
-                      <>
-                        <User className="h-4 w-4" />
-                        View My Queries
-                      </>
-                    )}
-                  </Button>
-                )}
+                {/* Drug search filter */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search medications..."
+                    value={drugSearchFilter}
+                    onChange={(e) => setDrugSearchFilter(e.target.value)}
+                    className="pl-10 h-9 text-sm"
+                  />
+                </div>
               </div>
-              {viewMode === 'admin' ? (
-                <AdminQueryHistory 
-                  onCreatePersonalQuery={handleCreatePersonalQuery}
-                  selectedQuery={selectedQuery}
-                  onSelectQuery={handleQuerySelected}
-                />
-              ) : (
+              
+              {/* Query History List */}
+              <div className="flex-1 overflow-hidden">
                 <QueryHistory 
                   refreshTrigger={queryRefreshTrigger} 
                   onQuerySelected={handleQuerySelected}
                   selectedQueryId={selectedQuery?.id}
+                  searchFilter={drugSearchFilter}
                 />
-              )}
+              </div>
             </div>
+            
+            {/* Resize handle - only show on desktop when sidebar is open */}
+            {!isMobile && isSidebarOpen && (
+              <div 
+                className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-border hover:bg-primary/50 transition-colors group"
+                onMouseDown={handleMouseDown}
+              >
+                <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-3 h-8 bg-muted border border-border rounded opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            )}
           </div>
 
             {/* Main Content */}
             <div className="flex-1 min-w-0"> {/* min-w-0 prevents flex overflow */}
               <div className="p-2 sm:p-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {!isSidebarOpen && (
+                  {/* Mobile toggle button - always show on mobile */}
+                  {isMobile && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        console.log('🔘 Toggle button clicked!', { isMobile, isSidebarOpen })
+                        toggleSidebar(true)
+                      }}
+                      title="Expand sidebar"
+                      className="hover:bg-muted transition-colors flex-shrink-0"
+                    >
+                      <PanelLeftOpen className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {/* Desktop expand button - show when sidebar is closed */}
+                  {!isMobile && !isSidebarOpen && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -212,19 +245,12 @@ export default function Home() {
                       <PanelLeftOpen className="h-4 w-4" />
                     </Button>
                   )}
-                  <h1 
-                    className="text-lg sm:text-xl font-bold cursor-pointer hover:text-primary transition-colors truncate" 
-                    onClick={handleNewQuery}
-                    title="Click to start a new query"
-                  >
-                    {isMobile ? 'MedGuard QA' : 'OpenFDA Medication QA'}
-                  </h1>
                   {!isMobile && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={handleNewQuery}
-                      className="hover:bg-muted transition-colors ml-3 flex-shrink-0"
+                      className="hover:bg-muted transition-colors flex-shrink-0"
                       title="New Query"
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -245,6 +271,7 @@ export default function Home() {
                       <Plus className="h-4 w-4" />
                     </Button>
                   )}
+
                   {/* Admin Link - only show for admin users */}
                   {isAdmin && (
                     <Button
@@ -268,7 +295,6 @@ export default function Home() {
                   onQuerySaved={handleQuerySaved}
                   selectedQuery={selectedQuery}
                   newQueryTrigger={newQueryTrigger}
-                  isAdminView={viewMode === 'admin'}
                 />
               </div>
             </div>
