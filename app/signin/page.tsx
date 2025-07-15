@@ -54,10 +54,10 @@ export default function SignInPage() {
     setError(null)
     setIsLoading(true)
     
-    const { error } = await signInWithGoogle()
-    
-    if (error) {
-      setError(error.message)
+    try {
+      await signInWithGoogle()
+    } catch (error: any) {
+      setError(error.message || 'Failed to sign in with Google')
     }
     
     setIsLoading(false)

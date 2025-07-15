@@ -7,10 +7,10 @@ import { MedicationQueryForm } from '@/components/medication-query-form'
 interface QueryWithUser {
   id: string
   user_query: string
-  medication_name: string
+  medication_name: string | null
   ai_response: string
   created_at: string
-  message_count: number
+  message_count?: number
   profiles?: {
     email: string
     full_name: string

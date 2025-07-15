@@ -6,7 +6,7 @@ import { useAuth } from './AuthContext'
 interface Query {
   id: string
   user_query: string
-  medication_name: string
+  medication_name: string | null
   ai_response: string
   created_at: string
   message_count?: number
@@ -17,6 +17,12 @@ interface Query {
   }
   user_email?: string
   user_name?: string
+}
+
+interface CacheHealth {
+  status: 'healthy' | 'warning' | 'error'
+  message: string
+  lastError?: Error
 }
 
 interface QueryCache {

@@ -13,7 +13,7 @@ import { useAdminQueries } from '@/hooks/useQueries'
 interface QueryWithUser {
   id: string
   user_query: string
-  medication_name: string
+  medication_name: string | null
   ai_response: string
   created_at: string
   message_count?: number

@@ -259,6 +259,6 @@ export function useUserQueries(options?: Omit<UseQueriesOptions, 'type'>) {
   return useQueries(false, options)
 }
 
-export function useAdminQueries(options?: Omit<UseQueriesOptions, 'type'>) {
-  return useQueries({ ...options, type: 'admin' })
+export function useAdminQueries(options: UseQueriesOptions = {}) {
+  return useQueries(true, options)
 }
