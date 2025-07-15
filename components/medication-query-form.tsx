@@ -671,7 +671,6 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
             <ProcessStream 
               steps={progressSteps.map(step => step.label)}
               title="Processing Your Query"
-              theme="modern"
               position="inline"
               hideDelay={5000}
             />
