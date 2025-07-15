@@ -6,13 +6,19 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Send, ChevronDown, ChevronUp, Globe, Pill } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
+import ProcessStream from '@/components/process-stream'
 import { useToast } from '@/hooks/use-toast'
-import { ProgressIndicator, ProgressStep } from '@/components/ui/progress-indicator'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUserQueries } from '@/hooks/useQueries'
 import { isLocalhost } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+
+interface ProgressStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'active' | 'completed' | 'error';
+}
 
 interface QueryResponse {
   response: string
@@ -234,6 +240,13 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       return { bottomLine, restOfText }
     }
     return { bottomLine: null, restOfText: text }
+  }
+
+  const handleSuggestedQuestion = (suggestedQuery: string) => {
+    setQuery(suggestedQuery)
+    // Optionally auto-submit the suggested question
+    // You can uncomment the next line if you want auto-submission
+    // setTimeout(() => handleSubmit({ preventDefault: () => {} } as React.FormEvent), 100)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -653,22 +666,18 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
             </div>
           </CardContent>
         )}
-      </Card>
-
-      {/* Progress Indicator */}
-      {isLoading && (
-        <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-900/10">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Processing Your Query
-            </CardTitle>
-          </CardHeader>
+        {isLoading && (
           <CardContent>
-            <ProgressIndicator steps={progressSteps} />
+            <ProcessStream 
+              steps={progressSteps.map(step => step.label)}
+              title="Processing Your Query"
+              theme="modern"
+              position="inline"
+              hideDelay={5000}
+            />
           </CardContent>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* Response Section */}
       {response && (
@@ -752,17 +761,48 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                               FDA SOURCE
                             </div>
                             <div className="flex-1">
-                              <p className="mb-1">
-                                This response includes official FDA drug labeling information from the FDA's National Drug Code Directory and drug labeling database.
-                              </p>
-                              <a 
-                                href={`https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=${encodeURIComponent(response.medication || '')}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline font-medium"
-                              >
-                                View official FDA labeling on DailyMed →
-                              </a>
+                              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  This response was generated using data from the FDA. For complete and official information, please refer to the official labeling.
+                                </p>
+                                <div className="mt-2 text-xs">
+                                  <a 
+                                    href={`https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${response.medication}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline font-medium"
+                                  >
+                                    View official FDA labeling on DailyMed →
+                                  </a>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">FDA Sections Used:</h4>
+                                <ul className="flex flex-wrap gap-2">
+                                  {response.fdaSections.map((section, index) => (
+                                    <li key={index} className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded px-2 py-1 font-mono">
+                                      {section}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">Suggested Questions:</h4>
+                                <ul className="list-disc pl-5 space-y-1">
+                                  {response.intents.map((intent, index) => (
+                                    <li key={index} className="text-sm">
+                                      <button 
+                                        onClick={() => handleSuggestedQuestion(intent)}
+                                        className="text-left w-full text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
+                                      >
+                                        {intent}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -864,12 +904,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                                   {message.citations && message.citations.length > 0 && (
                                     <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600">
                                       <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Sources:</h4>
-                                      <ol className="space-y-1">
+                                      <ol className="space-y-1 list-decimal pl-5">
                                         {message.citations.map((citation: any, index: number) => (
-                                          <li key={index} className="text-sm">
-                                            <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium mr-2">
-                                              {index + 1}
-                                            </span>
+                                          <li key={index} className="text-sm pl-2">
                                             <a 
                                               href={citation.url} 
                                               target="_blank" 

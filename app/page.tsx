@@ -14,7 +14,7 @@ import { PanelLeft, PanelLeftOpen, Plus, User, Users, Settings, Search } from 'l
 import { useAuth } from '@/contexts/AuthContext'
 import { useQueryCache } from '@/contexts/QueryCacheContext'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { CacheDebugger } from '@/components/debug/CacheDebugger'
+
 
 // Dynamically import AuthGuard to prevent hydration issues, not sure. 
 const AuthGuard = dynamic(() => import('../components/auth/AuthGuard').then(mod => ({ default: mod.AuthGuard })), {
@@ -40,8 +40,7 @@ export default function Home() {
   const [isResizing, setIsResizing] = useState(false)
   const { isAdmin } = useAuth()
   
-  // Show cache debugger in development mode
-  const isDevelopment = process.env.NODE_ENV === 'development'
+
 
   // Check if mobile on mount and window resize
   useEffect(() => {
@@ -99,6 +98,11 @@ export default function Home() {
 
   const handleQuerySelected = (query: any) => {
     setSelectedQuery(query)
+    // Auto-close sidebar on mobile when a query is selected
+    if (isMobile && isSidebarOpen) {
+      console.log('📱 Auto-closing sidebar after query selection on mobile')
+      toggleSidebar(false)
+    }
   }
 
   // Resize handlers
@@ -143,8 +147,11 @@ export default function Home() {
           {/* Mobile overlay backdrop */}
           {isMobile && isSidebarOpen && (
             <div 
-              className="fixed inset-0 bg-black/50 z-40 md:hidden" 
-              onClick={() => toggleSidebar(false)}
+              className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300" 
+              onClick={() => {
+                console.log('📱 Backdrop clicked - closing sidebar')
+                toggleSidebar(false)
+              }}
             />
           )}
           
@@ -159,10 +166,10 @@ export default function Home() {
                   }` 
                 : `${isSidebarOpen ? '' : 'w-0'} overflow-hidden`
               }
-              ${isSidebarOpen ? 'shadow-lg' : ''}
+              ${isSidebarOpen ? 'shadow-2xl' : ''}
             `}
             style={{
-              width: isMobile ? '320px' : (isSidebarOpen ? `${sidebarWidth}px` : '0px')
+              width: isMobile ? '280px' : (isSidebarOpen ? `${sidebarWidth}px` : '0px')
             }}>
             <div className="h-full flex flex-col">
               {/* Header with collapse button and search */}
@@ -227,10 +234,12 @@ export default function Home() {
                         console.log('🔘 Toggle button clicked!', { isMobile, isSidebarOpen })
                         toggleSidebar(true)
                       }}
-                      title="Expand sidebar"
-                      className="hover:bg-muted transition-colors flex-shrink-0"
+                      title="View Query History"
+                      className="hover:bg-muted transition-colors flex-shrink-0 relative"
                     >
                       <PanelLeftOpen className="h-4 w-4" />
+                      {/* Small indicator dot to show there are queries */}
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full opacity-60" />
                     </Button>
                   )}
                   {/* Desktop expand button - show when sidebar is closed */}
@@ -306,12 +315,7 @@ export default function Home() {
             <DisclaimerModal />
           </div>
           
-          {/* Cache Debugger for development mode - adjust for mobile */}
-          {isDevelopment && (
-            <div className={`${isMobile && isSidebarOpen ? 'hidden' : ''}`}>
-              <CacheDebugger />
-            </div>
-          )}
+
         </div>
       </AuthGuard>
     </>
