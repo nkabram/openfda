@@ -251,6 +251,7 @@ Please provide a helpful response to the user's question, focusing on the specif
     let queryId = null
     
     // Save to database if requested
+    console.log('saveToDatabase:', saveToDatabase, 'userId:', userId)
     if (saveToDatabase) {
       try {
         const { data: savedQuery, error: saveError } = await supabase
@@ -271,6 +272,7 @@ Please provide a helpful response to the user's question, focusing on the specif
         if (saveError) {
           console.error('Error saving query:', saveError)
         } else {
+          console.log('Query saved successfully with ID:', savedQuery.id)
           queryId = savedQuery.id
         }
       } catch (error) {

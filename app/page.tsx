@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { MedicationQueryForm } from '../components/medication-query-form'
+import { MedicationQueryHelpModal } from '../components/medication-query-help-modal'
 import { QueryHistory } from '../components/query-history'
 import { AuthWrapper } from '../components/auth/AuthWrapper'
 import { DisclaimerModal } from '../components/disclaimer-modal'
@@ -294,6 +295,7 @@ export default function Home() {
                       {!isMobile && <span className="ml-2">Admin</span>}
                     </Button>
                   )}
+                  <MedicationQueryHelpModal />
                   <ThemeToggle />
                   <AuthWrapper />
                 </div>

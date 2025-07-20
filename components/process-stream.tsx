@@ -12,15 +12,18 @@ const StreamingText: React.FC<StreamingTextProps> = ({ text, typingSpeed, onComp
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    if (!isActive || currentIndex >= text.length) {
-      if (currentIndex >= text.length && displayText === text) {
+    // Ensure text is a string
+    const textStr = typeof text === 'string' ? text : String(text || '');
+    
+    if (!isActive || currentIndex >= textStr.length) {
+      if (currentIndex >= textStr.length && displayText === textStr) {
         onComplete();
       }
       return;
     }
 
     const timer = setTimeout(() => {
-      setDisplayText(text.slice(0, currentIndex + 1));
+      setDisplayText(textStr.slice(0, currentIndex + 1));
       setCurrentIndex(currentIndex + 1);
     }, typingSpeed);
 
@@ -34,10 +37,12 @@ const StreamingText: React.FC<StreamingTextProps> = ({ text, typingSpeed, onComp
     }
   }, [isActive, text]);
 
+  const textStr = typeof text === 'string' ? text : String(text || '');
+  
   return (
     <span className="text-sm text-blue-600 dark:text-blue-400">
       {displayText}
-      {isActive && currentIndex < text.length && (
+      {isActive && currentIndex < textStr.length && (
         <span className="animate-pulse text-blue-600 dark:text-blue-400">|</span>
       )}
     </span>

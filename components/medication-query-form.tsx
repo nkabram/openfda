@@ -1,18 +1,21 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Send, ChevronDown, ChevronUp, Globe, Pill } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { ChevronDown, ChevronUp, Loader2, Send, HelpCircle, ArrowUp, MessageCircleQuestion, CircleHelp, Pill, Globe } from 'lucide-react'
 import * as Collapsible from '@radix-ui/react-collapsible'
-import ProcessStream from '@/components/process-stream'
-import { useToast } from '@/hooks/use-toast'
-import { useAuth } from '@/contexts/AuthContext'
-import { useUserQueries } from '@/hooks/useQueries'
-import { isLocalhost } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import SmartFollowUpInput from '@/components/SmartFollowUpInput'
+import { useQuerySubmission } from '@/hooks/useQuerySubmission'
+import { QueryInputForm } from '@/components/query/QueryInputForm'
+import { QueryResponse } from '@/components/query/QueryResponse'
+import { QueryProgress } from '@/components/query/QueryProgress'
+import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface ProgressStep {
   id: string;
@@ -20,7 +23,7 @@ interface ProgressStep {
   status: 'pending' | 'active' | 'completed' | 'error';
 }
 
-interface QueryResponse {
+interface MedicationQueryResponse {
   response: string
   medication: string | null
   intents: string[]
@@ -53,17 +56,23 @@ interface MedicationQueryFormProps {
 }
 
 export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigger, isAdminView = false, viewOnlyQuery }: MedicationQueryFormProps) {
+  // Use the custom hook for query submission logic
+  const {
+    submitQuery,
+    clearResponse,
+    isLoading,
+    response,
+    currentQueryId,
+    progressSteps,
+    setResponse,
+    setCurrentQueryId,
+    setProgressSteps
+  } = useQuerySubmission({ onQuerySaved, isAdminView })
+
+  // Local state for UI management
   const [query, setQuery] = useState('')
-  const [response, setResponse] = useState<QueryResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [followUpQuestion, setFollowUpQuestion] = useState('')
-  const [isFollowUpLoading, setIsFollowUpLoading] = useState(false)
   const [followUpMessages, setFollowUpMessages] = useState<FollowUpMessage[]>([])
-  const [currentQueryId, setCurrentQueryId] = useState<string | null>(null)
-  const [websearchEnabled, setWebsearchEnabled] = useState(false)
-  const [fdaDocsEnabled, setFdaDocsEnabled] = useState(true)
-  const [followUpMode, setFollowUpMode] = useState<'fda_docs' | 'websearch' | 'llm_only'>('fda_docs')
   const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
   const [followUpDetailStates, setFollowUpDetailStates] = useState<{[key: string]: boolean}>({})
   const [needsMoreInfoPrompt, setNeedsMoreInfoPrompt] = useState<{
@@ -72,17 +81,10 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     medication: string
     originalQuestion: string
   } | null>(null)
-  const followUpRef = useRef<HTMLTextAreaElement>(null)
+
+  // Hooks
   const { toast } = useToast()
   const { session } = useAuth()
-  const { addQuery: addQueryToCache } = useUserQueries({ autoFetch: false })
-
-  const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([
-    { id: 'identify', label: 'Identifying medication & intent', status: 'pending' },
-    { id: 'search', label: 'Searching FDA documents', status: 'pending' },
-    { id: 'generate', label: 'Generating query', status: 'pending' },
-    { id: 'respond', label: 'Generating response', status: 'pending' },
-  ])
 
   // Effect to handle selected query
   useEffect(() => {
@@ -154,7 +156,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
         id: msg.id,
         type: msg.message_type,
         content: msg.content,
-        timestamp: new Date(msg.created_at)
+        timestamp: new Date(msg.created_at),
+        citations: msg.citations || [],
+        websearchUsed: msg.websearch_enabled || false
       }))
 
       setFollowUpMessages(followUpMessages)
@@ -166,12 +170,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   // Helper function to start a new query
   const handleNewQuery = () => {
     setQuery('')
-    setResponse(null)
+    clearResponse()
     setFollowUpMessages([])
-    setCurrentQueryId(null)
     setIsCollapsed(false)
-    setFollowUpQuestion('')
-    resetProgress()
   }
 
   // Helper function to get auth headers
@@ -205,40 +206,25 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     ])
   }
 
-  // Mode switching functions
-  const handleFdaDocsToggle = () => {
-    if (!fdaDocsEnabled) {
-      setFdaDocsEnabled(true)
-      setWebsearchEnabled(false)
-      setFollowUpMode('fda_docs')
-    } else {
-      setFdaDocsEnabled(false)
-      if (!websearchEnabled) {
-        setFollowUpMode('llm_only')
-      }
-    }
-  }
-
-  const handleWebsearchToggle = () => {
-    if (!websearchEnabled) {
-      setWebsearchEnabled(true)
-      setFdaDocsEnabled(false)
-      setFollowUpMode('websearch')
-    } else {
-      setWebsearchEnabled(false)
-      if (!fdaDocsEnabled) {
-        setFollowUpMode('llm_only')
-      }
-    }
-  }
+  // Note: Mode switching is now handled by SmartFollowUpInput component
 
   const parseBottomLine = (text: string) => {
-    const bottomLineMatch = text.match(/\*\*Bottom Line:\*\*\s*([^*\n]+)/i)
+    // Try formatted version first (with asterisks)
+    let bottomLineMatch = text.match(/\*\*Bottom Line:\*\*\s*([^*\n]+)/i)
     if (bottomLineMatch) {
       const bottomLine = bottomLineMatch[1].trim()
       const restOfText = text.replace(bottomLineMatch[0], '').trim()
       return { bottomLine, restOfText }
     }
+    
+    // Try unformatted version (without asterisks)
+    bottomLineMatch = text.match(/Bottom line:\s*([^\n]+)/i)
+    if (bottomLineMatch) {
+      const bottomLine = bottomLineMatch[1].trim()
+      const restOfText = text.replace(bottomLineMatch[0], '').trim()
+      return { bottomLine, restOfText }
+    }
+    
     return { bottomLine: null, restOfText: text }
   }
 
@@ -253,230 +239,46 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     e.preventDefault()
     
     if (!query.trim()) {
-      toast({
-        title: "Please enter a question",
-        variant: "destructive",
-      })
       return
     }
 
-    setIsLoading(true)
-    setResponse(null)
+    // Clear follow-up messages when starting new query
     setFollowUpMessages([])
-    setCurrentQueryId(null)
-    resetProgress()
-
-    try {
-      // Step 1: Extract medication name and intent
-      updateStepStatus('identify', 'active')
-      const extractResponse = await fetch('/api/extract-medication', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ query }),
-      })
-
-      if (!extractResponse.ok) {
-        updateStepStatus('identify', 'error')
-        throw new Error('Failed to extract medication and intent')
-      }
-
-      const { medication, intents, fdaSections } = await extractResponse.json()
-      updateStepStatus('identify', 'completed')
-
-      // Step 2: Generate AI response with FDA data
-      updateStepStatus('search', 'active')
-      
-      setTimeout(() => {
-        updateStepStatus('search', 'completed')
-        updateStepStatus('generate', 'active')
-      }, 500)
-
-      const generateResponse = await fetch('/api/generate-response', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ 
-          query, 
-          medication, 
-          intents, 
-          fdaSections,
-          saveToDatabase: true
-        }),
-      })
-
-      if (!generateResponse.ok) {
-        updateStepStatus('generate', 'error')
-        throw new Error('Failed to generate response')
-      }
-
-      updateStepStatus('generate', 'completed')
-      updateStepStatus('respond', 'active')
-
-      const responseData = await generateResponse.json()
-      setResponse(responseData)
-      updateStepStatus('respond', 'completed')
-
-      // Set the query ID from the response (saved by generate-response API)
-      if (responseData.queryId) {
-        setCurrentQueryId(responseData.queryId)
-        
-        // Create a query object for cache and parent component
-        const newQuery = {
-          id: responseData.queryId,
-          user_query: query,
-          medication_name: responseData.medication,
-          detected_intents: responseData.intents,
-          fda_sections: responseData.fdaSections,
-          fda_response: responseData.fdaData,
-          ai_response: responseData.response,
-          created_at: new Date().toISOString(),
-          message_count: 0
-        }
-        
-        // Add to cache for immediate UI update
-        if (!isAdminView) {
-          addQueryToCache(newQuery)
-        }
-        
-        // Notify parent component to update query history if needed
-        if (onQuerySaved) {
-          onQuerySaved(newQuery)
-        }
-      }
-
+    
+    // Use the hook's submitQuery function
+    const result = await submitQuery(query)
+    
+    if (result) {
       // Collapse the form after successful submission
       setIsCollapsed(true)
-
-      toast({
-        title: "Response generated successfully",
-      })
-    } catch (error) {
-      console.error('Error processing query:', error)
-      toast({
-        title: "Error processing your question",
-        description: "Please try again later.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
     }
   }
 
-  const handleFollowUpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Handler for smart follow-up input component
+  const handleSmartFollowUpAdded = async (newMessages: FollowUpMessage[]) => {
+    // Since the API saves messages to database, reload from database instead of adding locally
+    // This prevents duplication when messages are loaded from database
+    if (currentQueryId) {
+      await loadFollowUpMessages(currentQueryId)
+    }
     
-    if (!followUpQuestion.trim() || !currentQueryId) {
-      return
-    }
-
-    setIsFollowUpLoading(true)
-
-    try {
-      let apiEndpoint = '/api/follow-up'
-      let requestBody: any = {
-        queryId: currentQueryId,
-        followUpQuestion: followUpQuestion.trim(),
-      }
-
-      // Choose API endpoint based on follow-up mode
-      if (followUpMode === 'websearch') {
-        apiEndpoint = '/api/follow-up-websearch'
-      } else if (followUpMode === 'fda_docs') {
-        apiEndpoint = '/api/follow-up-fda'
-        requestBody.mode = 'fda_docs'
-      } else if (followUpMode === 'llm_only') {
-        apiEndpoint = '/api/follow-up-fda'
-        requestBody.mode = 'llm_only'
-      }
-
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(requestBody),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get follow-up response')
-      }
-
-      const followUpResponse = data.response
-
-      // Check if more info is needed and show prompt
-      if (data.needsMoreInfo && followUpMode === 'fda_docs') {
-        setNeedsMoreInfoPrompt({
-          show: true,
-          searchedSections: data.searchedSections || [],
-          medication: data.medication || 'the medication',
-          originalQuestion: followUpQuestion.trim()
-        })
-      } else {
-        // Clear any existing prompt
-        setNeedsMoreInfoPrompt(null)
-      }
-
-      // Add both question and answer to messages
-      setFollowUpMessages(prev => [
-        ...prev,
-        {
-          id: `question-${Date.now()}`,
-          type: 'question',
-          content: followUpQuestion.trim(),
-          timestamp: new Date(),
-        },
-        {
-          id: `answer-${Date.now()}`,
-          type: 'answer',
-          content: followUpResponse,
-          timestamp: new Date(),
-          websearchUsed: data.websearchUsed || followUpMode === 'websearch',
-          citations: data.citations || [],
-        },
-      ])
-
-      setFollowUpQuestion('')
-      
-      toast({
-        title: "Follow-up response generated",
-        description: followUpMode === 'fda_docs' ? 'Using saved FDA documentation' : 
-                    followUpMode === 'websearch' ? 'Using web search' : 
-                    'Using general knowledge'
-      })
-    } catch (error) {
-      console.error('Error processing follow-up:', error)
-      toast({
-        title: "Error processing follow-up question",
-        description: "Please try again later.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsFollowUpLoading(false)
-    }
+    // Clear any existing "needs more info" prompt since we have a new response
+    setNeedsMoreInfoPrompt(null)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e as any)
     }
   }
 
-  const handleFollowUpKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleFollowUpSubmit(e as any)
-    }
-  }
-
   const startNewQuery = () => {
     setQuery('')
-    setResponse(null)
+    clearResponse()
     setIsCollapsed(false)
     setFollowUpMessages([])
-    setCurrentQueryId(null)
-    setFollowUpQuestion('')
     setNeedsMoreInfoPrompt(null)
-    resetProgress()
   }
 
   const handleNewFDASearch = async () => {
@@ -487,11 +289,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     
     // Set the query to the original question and trigger a new search
     setQuery(needsMoreInfoPrompt.originalQuestion)
-    setResponse(null)
+    clearResponse()
     setIsCollapsed(false)
     setFollowUpMessages([])
-    setCurrentQueryId(null)
-    setFollowUpQuestion('')
     
     // Auto-submit the query
     setTimeout(() => {
@@ -505,15 +305,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   const handleNewWebSearch = () => {
     if (!needsMoreInfoPrompt) return
     
-    // Dismiss the prompt and switch to web search mode
+    // Dismiss the prompt - SmartFollowUpInput will handle web search
     setNeedsMoreInfoPrompt(null)
-    setFollowUpMode('websearch')
-    setFollowUpQuestion(needsMoreInfoPrompt.originalQuestion)
-    
-    // Focus the follow-up input
-    setTimeout(() => {
-      followUpRef.current?.focus()
-    }, 100)
   }
 
   const dismissMoreInfoPrompt = () => {
@@ -523,54 +316,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Query Input Section */}
-      <Card className="border-2 border-border">
-        <CardHeader 
-          className={`${isCollapsed ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors`}
-          onClick={isCollapsed ? () => setIsCollapsed(false) : undefined}
-        >
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {!isCollapsed && (
-                <span className="text-lg">
-                  💊 {isAdminView ? 'View Query' : 'Ask a Medication Question'}
-                </span>
-              )}
-              {isCollapsed && response && (
-                <span className="text-lg">💊 Medication Query</span>
-              )}
-              {isCollapsed && response && (
-                <div className="text-sm font-normal text-muted-foreground bg-muted px-2 py-1 rounded">
-                  Query complete
-                </div>
-              )}
-              {isAdminView && (
-                <div className="text-sm font-normal text-blue-600 bg-blue-100 px-2 py-1 rounded dark:text-blue-400 dark:bg-blue-900/50">
-                  Admin View (Read Only)
-                </div>
-              )}
-            </div>
-            {isCollapsed ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <span className="text-sm font-normal">
-                  Click to expand
-                </span>
-                <ChevronDown className="h-4 w-4" />
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsCollapsed(true)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <ChevronUp className="h-4 w-4" />
-              </Button>
-            )}
-          </CardTitle>
-        </CardHeader>
-        
-        {!isCollapsed && (
-          <CardContent className="border-t bg-muted/20">
+      <Card className="border-0 shadow-none">
+        <CardContent className="p-6 bg-background">
             {/* User Information in Admin View */}
             {isAdminView && (selectedQuery?.profiles || viewOnlyQuery) && (() => {
               const queryData = viewOnlyQuery || selectedQuery
@@ -605,39 +352,23 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
             
             {!isAdminView ? (
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
+                <div className="relative">
                   <Textarea
-                    placeholder="Ask any question about medications, side effects, interactions, dosages, etc. For example: 'What are the side effects of ibuprofen?' or 'Can I take aspirin with food?'"
+                    placeholder="Ask a medication question"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="min-h-[100px] resize-none bg-background focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
+                    className="min-h-[120px] resize-none bg-background text-foreground placeholder:text-muted-foreground border-input focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
                     disabled={isLoading}
                   />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Press Ctrl+Enter to submit
-                  </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={isLoading || !query.trim()}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 h-4 w-4" />
-                        Ask Question
-                      </>
-                    )}
-                  </Button>
-                  {response && (
-                    <Button type="button" variant="outline" onClick={startNewQuery}>
+                {response && (
+                  <div className="flex justify-end">
+                    <Button type="button" variant="outline" onClick={startNewQuery} className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950">
                       Ask Another Question
                     </Button>
-                  )}
-                </div>
+                  </div>
+                )}
               </form>
             ) : (
               <div className="space-y-4">
@@ -654,25 +385,15 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                 </div>
               </div>
             )}
-          </CardContent>
-        )}
+        </CardContent>
 
-        {/* Show query as read-only text when collapsed and response exists */}
-        {isCollapsed && response && query && (
-          <CardContent className="border-t bg-muted/10">
-            <div className="py-2">
-              <span className="text-sm font-medium text-muted-foreground">Query:</span>
-              <span className="text-sm text-muted-foreground/70 ml-2">{query}</span>
-            </div>
-          </CardContent>
-        )}
+
         {isLoading && (
           <CardContent>
-            <ProcessStream 
-              steps={progressSteps.map(step => step.label)}
+            <QueryProgress 
+              steps={progressSteps}
+              isVisible={true}
               title="Processing Your Query"
-              position="inline"
-              hideDelay={5000}
             />
           </CardContent>
         )}
@@ -696,127 +417,132 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
               <div className="space-y-4">
                 {/* Bottom Line - Always Visible */}
                 {bottomLine && (
-                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-800/50">
-                    <div className="font-semibold text-blue-900 dark:text-blue-100 text-base leading-relaxed">
-                      {bottomLine}
+                  <div className="space-y-3">
+                    <div className="p-4 bg-gradient-to-r from-sky-50 to-sky-100 border border-sky-200 rounded-xl shadow-sm dark:from-sky-950/30 dark:to-sky-900/30 dark:border-sky-800/50">
+                      <div className="font-semibold text-sky-900 dark:text-sky-100 text-base leading-relaxed">
+                        {bottomLine}
+                      </div>
                     </div>
-                  </div>
-                )}
-                
-                {/* Collapsible Detailed Explanation */}
-                <Collapsible.Root open={isDetailedExplanationOpen} onOpenChange={setIsDetailedExplanationOpen}>
-                  <Collapsible.Trigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-center p-2 h-auto hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all duration-200"
-                    >
-                      <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 text-xs">
-                        <span className="font-medium">Show detailed explanation</span>
-                        {isDetailedExplanationOpen ? (
-                          <ChevronUp className="h-3 w-3" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3" />
-                        )}
-                      </div>
-                    </Button>
-                  </Collapsible.Trigger>
-                  
-                  <Collapsible.Content className="data-[state=open]:animate-slideDown data-[state=closed]:animate-slideUp overflow-hidden">
-                    <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner mt-2">
-                      <div className="prose prose-sm max-w-none dark:prose-invert
-                        prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-headings:font-semibold prose-headings:mb-3 prose-headings:mt-4 first:prose-headings:mt-0
-                        prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4
-                        prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
-                        prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ul:mb-4 prose-ul:space-y-1
-                        prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-ol:mb-4 prose-ol:space-y-1
-                        prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-li:leading-relaxed
-                        prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-blockquote:bg-slate-100/50 dark:prose-blockquote:bg-slate-800/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded
-                        prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
-                        prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
-                        prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium prose-a:no-underline hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300 hover:prose-a:underline
-                        prose-hr:border-slate-300 dark:prose-hr:border-slate-600 prose-hr:my-6
-                        [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                        <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
-                            h1: ({ children }) => <h1 className="text-lg font-semibold mb-3 mt-6 first:mt-0">{children}</h1>,
-                            h2: ({ children }) => <h2 className="text-base font-semibold mb-3 mt-5 first:mt-0">{children}</h2>,
-                            h3: ({ children }) => <h3 className="text-sm font-semibold mb-2 mt-4 first:mt-0">{children}</h3>,
-                            ul: ({ children }) => <ul className="mb-4 space-y-1 pl-4">{children}</ul>,
-                            ol: ({ children }) => <ol className="mb-4 space-y-1 pl-4">{children}</ol>,
-                            li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                          }}
-                        >
-                          {restOfText}
-                        </ReactMarkdown>
-                      </div>
-                      
-                      {/* FDA Data Source Info - Moved inside details */}
-                      {response.fdaData && response.fdaData.results && (
-                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600">
-                          <div className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
-                            <div className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-blue-700 dark:text-blue-300 font-medium">
-                              FDA SOURCE
+                    
+                    {/* More details section with fixed button position */}
+                    <Collapsible.Root open={isDetailedExplanationOpen} onOpenChange={setIsDetailedExplanationOpen}>
+                      <div className="flex justify-end">
+                        <Collapsible.Trigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 h-auto p-1 text-xs"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">More details</span>
+                              {isDetailedExplanationOpen ? (
+                                <ChevronUp className="h-3 w-3" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3" />
+                              )}
                             </div>
-                            <div className="flex-1">
-                              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                  This response was generated using data from the FDA. For complete and official information, please refer to the official labeling.
-                                </p>
-                                <div className="mt-2 text-xs">
-                                  <a 
-                                    href={`https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${response.medication}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline font-medium"
-                                  >
-                                    View official FDA labeling on DailyMed →
-                                  </a>
+                          </Button>
+                        </Collapsible.Trigger>
+                      </div>
+                  
+                      <Collapsible.Content className="data-[state=open]:animate-slideDown data-[state=closed]:animate-slideUp overflow-hidden">
+                        <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner mt-2">
+                          <div className="prose prose-sm max-w-none dark:prose-invert
+                            prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-headings:font-semibold prose-headings:mb-3 prose-headings:mt-4 first:prose-headings:mt-0
+                            prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4
+                            prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
+                            prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ul:mb-4 prose-ul:space-y-1
+                            prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-ol:mb-4 prose-ol:space-y-1
+                            prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-li:leading-relaxed
+                            prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-blockquote:bg-slate-100/50 dark:prose-blockquote:bg-slate-800/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded
+                            prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
+                            prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
+                            prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium prose-a:no-underline hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300 hover:prose-a:underline
+                            prose-hr:border-slate-300 dark:prose-hr:border-slate-600 prose-hr:my-6
+                            [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                            <ReactMarkdown 
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                                h1: ({ children }) => <h1 className="text-lg font-semibold mb-3 mt-6 first:mt-0">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-base font-semibold mb-3 mt-5 first:mt-0">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-sm font-semibold mb-2 mt-4 first:mt-0">{children}</h3>,
+                                ul: ({ children }) => <ul className="mb-4 space-y-1 pl-4">{children}</ul>,
+                                ol: ({ children }) => <ol className="mb-4 space-y-1 pl-4">{children}</ol>,
+                                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                              }}
+                            >
+                              {restOfText}
+                            </ReactMarkdown>
+                          </div>
+                          
+                          {/* FDA Data Source Info - Moved inside details */}
+                          {response.fdaData && response.fdaData.results && (
+                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600">
+                              <div className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                <div className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-blue-700 dark:text-blue-300 font-medium">
+                                  FDA SOURCE
+                                </div>
+                                <div className="flex-1">
+                                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                      This response was generated using data from the FDA. For complete and official information, please refer to the official labeling.
+                                    </p>
+                                    <div className="mt-2 text-xs">
+                                      <a 
+                                        href={`https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${response.medication}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline font-medium"
+                                      >
+                                        View official FDA labeling on DailyMed →
+                                      </a>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">FDA Sections Used:</h4>
+                                    <ul className="flex flex-wrap gap-2">
+                                      {response.fdaSections?.map((section, index) => (
+                                        <li key={index} className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded px-2 py-1 font-mono">
+                                          {section}
+                                        </li>
+                                      )) || []}
+                                    </ul>
+                                  </div>
+
+                                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">Suggested Questions:</h4>
+                                    <ul className="list-disc pl-5 space-y-1">
+                                      {response.intents.map((intent, index) => (
+                                        <li key={index} className="text-sm">
+                                          <button 
+                                            onClick={() => handleSuggestedQuestion(intent)}
+                                            className="text-left w-full text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
+                                          >
+                                            {intent}
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
                                 </div>
                               </div>
-
-                              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">FDA Sections Used:</h4>
-                                <ul className="flex flex-wrap gap-2">
-                                  {response.fdaSections.map((section, index) => (
-                                    <li key={index} className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded px-2 py-1 font-mono">
-                                      {section}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-
-                              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">Suggested Questions:</h4>
-                                <ul className="list-disc pl-5 space-y-1">
-                                  {response.intents.map((intent, index) => (
-                                    <li key={index} className="text-sm">
-                                      <button 
-                                        onClick={() => handleSuggestedQuestion(intent)}
-                                        className="text-left w-full text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                                      >
-                                        {intent}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </Collapsible.Content>
-                </Collapsible.Root>
+                      </Collapsible.Content>
+                    </Collapsible.Root>
+                  </div>
+                )}
               </div>
             )
           })()}
-      </div>
+        </div>
       )}
 
       {/* Follow-up Messages */}
-      {followUpMessages.length > 0 && (
+      {followUpMessages && followUpMessages.length > 0 && (
         <div className="space-y-6">
           {followUpMessages.map((message) => (
             <div key={message.id} className="space-y-3">
@@ -830,99 +556,114 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
               
               {message.type === 'answer' && (
                 <div className="flex items-start gap-3">
-                  <div className="flex-1 space-y-3">
+                  <div className="flex-1">
                     {(() => {
                       const { bottomLine, restOfText } = parseBottomLine(message.content)
                       return (
-                        <div>
-                          {/* Always visible summary */}
-                          {bottomLine && (
-                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                              <p className="text-blue-900 dark:text-blue-100 font-medium">
-                                {bottomLine}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Collapsible detailed explanation */}
-                          {restOfText && (
-                            <Collapsible.Root 
-                              open={followUpDetailStates[message.id] || false}
-                              onOpenChange={(open) => 
-                                setFollowUpDetailStates(prev => ({ ...prev, [message.id]: open }))
-                              }
-                            >
-                              <Collapsible.Trigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  className="w-full justify-center p-2 h-auto hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all duration-200"
-                                >
-                                  <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 text-xs">
-                                    <span className="font-medium">Show detailed explanation</span>
-                                    {followUpDetailStates[message.id] ? (
-                                      <ChevronUp className="h-3 w-3" />
-                                    ) : (
-                                      <ChevronDown className="h-3 w-3" />
+                        <div className="space-y-3">
+                          {/* Summary and collapsible section in one container */}
+                          <div className="relative">
+                            {/* Always visible summary */}
+                            {bottomLine && (
+                              <div className="p-3 bg-gradient-to-r from-sky-50 to-sky-100 border border-sky-200 rounded-lg shadow-sm dark:from-sky-950/30 dark:to-sky-900/30 dark:border-sky-800/50">
+                                <p className="text-sky-900 dark:text-sky-100 font-medium">
+                                  {bottomLine}
+                                </p>
+                              </div>
+                            )}
+                            
+                            {/* Collapsible content */}
+                            {restOfText && (
+                              <Collapsible.Root 
+                                open={followUpDetailStates[message.id] || false}
+                                onOpenChange={(open) => 
+                                  setFollowUpDetailStates(prev => ({ ...prev, [message.id]: open }))
+                                }
+                                className="mt-2"
+                              >
+                                <div className="relative">
+                                  {/* Toggle button - now at the top */}
+                                  <div className="flex justify-end mb-1">
+                                    <Collapsible.Trigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 h-auto p-1 text-xs transition-colors"
+                                      >
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium">
+                                            {followUpDetailStates[message.id] ? 'Hide details' : 'More details'}
+                                          </span>
+                                          {followUpDetailStates[message.id] ? (
+                                            <ChevronUp className="h-3 w-3" />
+                                          ) : (
+                                            <ChevronDown className="h-3 w-3" />
+                                          )}
+                                        </div>
+                                      </Button>
+                                    </Collapsible.Trigger>
+                                  </div>
+
+                                  {/* Content that expands/collapses */}
+                                  <Collapsible.Content className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                                    {followUpDetailStates[message.id] && (
+                                      <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner">
+                                        <div className="prose prose-sm max-w-none dark:prose-invert
+                                          prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-headings:font-semibold prose-headings:mb-3 prose-headings:mt-4 first:prose-headings:mt-0
+                                          prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4
+                                          prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
+                                          prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ul:mb-4 prose-ul:space-y-1
+                                          prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-ol:mb-4 prose-ol:space-y-1
+                                          prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-li:leading-relaxed
+                                          prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-blockquote:bg-slate-100/50 dark:prose-blockquote:bg-slate-800/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded
+                                          prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
+                                          prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
+                                          prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium prose-a:no-underline hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300 hover:prose-a:underline
+                                          prose-hr:border-slate-300 dark:prose-hr:border-slate-600 prose-hr:my-6
+                                          [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                                          <ReactMarkdown 
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                              p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                                              h1: ({ children }) => <h1 className="text-lg font-semibold mb-3 mt-6 first:mt-0">{children}</h1>,
+                                              h2: ({ children }) => <h2 className="text-base font-semibold mb-3 mt-5 first:mt-0">{children}</h2>,
+                                              h3: ({ children }) => <h3 className="text-sm font-semibold mb-2 mt-4 first:mt-0">{children}</h3>,
+                                              ul: ({ children }) => <ul className="mb-4 space-y-1 pl-4">{children}</ul>,
+                                              ol: ({ children }) => <ol className="mb-4 space-y-1 pl-4">{children}</ol>,
+                                              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                                            }}
+                                          >
+                                            {restOfText}
+                                          </ReactMarkdown>
+                                        </div>
+                                        
+                                        {/* Citations for follow-up answers */}
+                                        {message.citations && message.citations.length > 0 && (
+                                          <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600">
+                                            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Sources:</h4>
+                                            <ol className="space-y-1 list-decimal pl-5">
+                                              {message.citations?.map((citation: any, index: number) => (
+                                                <li key={index} className="text-sm pl-2">
+                                                  <a 
+                                                    href={citation.url} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium underline decoration-blue-300 dark:decoration-blue-600 underline-offset-2"
+                                                  >
+                                                    {citation.title}
+                                                  </a>
+                                                </li>
+                                              )) || []}
+                                            </ol>
+                                          </div>
+                                        )}
+                                      </div>
                                     )}
-                                  </div>
-                                </Button>
-                              </Collapsible.Trigger>
-                              
-                              <Collapsible.Content className="data-[state=open]:animate-slideDown data-[state=closed]:animate-slideUp overflow-hidden">
-                                <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner mt-2">
-                                  <div className="prose prose-sm max-w-none dark:prose-invert
-                                    prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-headings:font-semibold prose-headings:mb-3 prose-headings:mt-4 first:prose-headings:mt-0
-                                    prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4
-                                    prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
-                                    prose-ul:text-slate-700 dark:prose-ul:text-slate-300 prose-ul:mb-4 prose-ul:space-y-1
-                                    prose-ol:text-slate-700 dark:prose-ol:text-slate-300 prose-ol:mb-4 prose-ol:space-y-1
-                                    prose-li:text-slate-700 dark:prose-li:text-slate-300 prose-li:leading-relaxed
-                                    prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-blockquote:bg-slate-100/50 dark:prose-blockquote:bg-slate-800/50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded
-                                    prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-200 dark:prose-code:bg-slate-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
-                                    prose-pre:bg-slate-100 dark:prose-pre:bg-slate-800 prose-pre:text-slate-800 dark:prose-pre:text-slate-200 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
-                                    prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:font-medium prose-a:no-underline hover:prose-a:text-blue-800 dark:hover:prose-a:text-blue-300 hover:prose-a:underline
-                                    prose-hr:border-slate-300 dark:prose-hr:border-slate-600 prose-hr:my-6
-                                    [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                                    <ReactMarkdown 
-                                      remarkPlugins={[remarkGfm]}
-                                      components={{
-                                        p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
-                                        h1: ({ children }) => <h1 className="text-lg font-semibold mb-3 mt-6 first:mt-0">{children}</h1>,
-                                        h2: ({ children }) => <h2 className="text-base font-semibold mb-3 mt-5 first:mt-0">{children}</h2>,
-                                        h3: ({ children }) => <h3 className="text-sm font-semibold mb-2 mt-4 first:mt-0">{children}</h3>,
-                                        ul: ({ children }) => <ul className="mb-4 space-y-1 pl-4">{children}</ul>,
-                                        ol: ({ children }) => <ol className="mb-4 space-y-1 pl-4">{children}</ol>,
-                                        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                                      }}
-                                    >
-                                      {restOfText}
-                                    </ReactMarkdown>
-                                  </div>
-                                  
-                                  {/* Citations for follow-up answers */}
-                                  {message.citations && message.citations.length > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600">
-                                      <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Sources:</h4>
-                                      <ol className="space-y-1 list-decimal pl-5">
-                                        {message.citations.map((citation: any, index: number) => (
-                                          <li key={index} className="text-sm pl-2">
-                                            <a 
-                                              href={citation.url} 
-                                              target="_blank" 
-                                              rel="noopener noreferrer"
-                                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium underline decoration-blue-300 dark:decoration-blue-600 underline-offset-2"
-                                            >
-                                              {citation.title}
-                                            </a>
-                                          </li>
-                                        ))}
-                                      </ol>
-                                    </div>
-                                  )}
+                                  </Collapsible.Content>
                                 </div>
-                              </Collapsible.Content>
-                            </Collapsible.Root>
-                          )}
+                              </Collapsible.Root>
+                            )}
+                          </div>
                         </div>
                       )
                     })()}
@@ -987,93 +728,17 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
       )}
-
-      {/* Follow-up Input - Simplified Chat Style */}
+      
+      {/* Smart Follow-up Input */}
       {response && currentQueryId && !isAdminView && (
-        <div className="space-y-4">
-          <form onSubmit={handleFollowUpSubmit} className="relative">
-            <Textarea
-              ref={followUpRef}
-              placeholder="Ask a follow-up question..."
-              value={followUpQuestion}
-              onChange={(e) => {
-                setFollowUpQuestion(e.target.value)
-                // Dismiss the more info prompt when user starts typing
-                if (needsMoreInfoPrompt?.show && e.target.value.trim()) {
-                  setNeedsMoreInfoPrompt(null)
-                }
-              }}
-              onKeyDown={handleFollowUpKeyDown}
-              className="min-h-[60px] resize-none bg-background pr-20"
-              disabled={isFollowUpLoading}
-            />
-            <div className="absolute right-2 bottom-2 flex items-center gap-1">
-              {/* FDA Docs Toggle */}
-              <Button 
-                type="button" 
-                size="sm"
-                onClick={handleFdaDocsToggle}
-                className={`h-8 w-8 p-0 ${
-                  followUpMode === 'fda_docs'
-                    ? 'bg-green-100 hover:bg-green-200 text-green-600 dark:bg-green-900/50 dark:hover:bg-green-800/50 dark:text-green-400' 
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-400'
-                }`}
-                title={followUpMode === 'fda_docs' ? 'Using FDA documentation' : 'Click to use FDA documentation'}
-              >
-                <Pill className="h-4 w-4" />
-              </Button>
-              
-              {/* Web Search Toggle */}
-              <Button 
-                type="button" 
-                size="sm"
-                onClick={handleWebsearchToggle}
-                className={`h-8 w-8 p-0 ${
-                  followUpMode === 'websearch'
-                    ? 'bg-blue-100 hover:bg-blue-200 text-blue-600 dark:bg-blue-900/50 dark:hover:bg-blue-800/50 dark:text-blue-400' 
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-400'
-                }`}
-                title={followUpMode === 'websearch' ? 'Using web search' : 'Click to use web search'}
-              >
-                <Globe className="h-4 w-4" />
-              </Button>
-              
-              {/* LLM Only Toggle */}
-              <Button 
-                type="button" 
-                size="sm"
-                onClick={() => {
-                  setFdaDocsEnabled(false)
-                  setWebsearchEnabled(false)
-                  setFollowUpMode('llm_only')
-                }}
-                className={`h-8 w-8 p-0 ${
-                  followUpMode === 'llm_only'
-                    ? 'bg-purple-100 hover:bg-purple-200 text-purple-600 dark:bg-purple-900/50 dark:hover:bg-purple-800/50 dark:text-purple-400' 
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-400'
-                }`}
-                title={followUpMode === 'llm_only' ? 'Using general knowledge only' : 'Click to use general knowledge only'}
-              >
-                <span className="text-xs font-bold">AI</span>
-              </Button>
-              <Button 
-                type="submit" 
-                size="sm"
-                disabled={!followUpQuestion.trim() || isFollowUpLoading}
-                className="h-8 w-8 p-0"
-              >
-                {isFollowUpLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </form>
-        </div>
+        <SmartFollowUpInput
+          queryId={currentQueryId}
+          onMessageAdded={handleSmartFollowUpAdded}
+          disabled={isLoading}
+        />
       )}
     </div>
   )

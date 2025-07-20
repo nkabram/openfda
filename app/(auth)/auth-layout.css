@@ -1,0 +1,18 @@
+/* Ensure the background color is applied to the entire page */
+html, body, #__next {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #111113;
+}
+
+/* Target the root layout's body */
+body {
+  background-color: #111113 !important;
+}
+
+/* Ensure the auth container takes full height */
+.min-h-screen {
+  min-height: 100vh;
+  background-color: #111113;
+}

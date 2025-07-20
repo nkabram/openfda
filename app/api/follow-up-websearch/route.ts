@@ -150,34 +150,60 @@ Please provide a helpful response to this follow-up question, taking into accoun
 
     let rawResponse = completion.output_text || 'I apologize, but I was unable to generate a response.'
     
+    // Debug: Log the full completion object to understand its structure
+    console.log('🔍 Full completion object:', JSON.stringify(completion, null, 2))
+    
     // Extract citations from the OpenAI response
     let citations: any[] = []
     let formattedResponse = rawResponse
     
-    // Parse URLs from the response and extract them as citations
-    const urlRegex = /\[([^\]]+)\]\(([^)]+)\)/g
-    const urlMatches = Array.from(rawResponse.matchAll(urlRegex))
+    // Check if citations are available in the completion object
+    const completionAny = completion as any
+    if (completionAny.citations && Array.isArray(completionAny.citations)) {
+      citations = completionAny.citations.map((citation: any, index: number) => ({
+        title: citation.title || citation.url || `Source ${index + 1}`,
+        url: citation.url,
+        snippet: citation.snippet || `Information from ${new URL(citation.url).hostname}`,
+        display_url: new URL(citation.url).hostname,
+        position: index + 1
+      }))
+      console.log('✅ Found citations in completion object:', citations.length)
+    }
     
-    if (urlMatches.length > 0) {
-      citations = urlMatches.map((match, index) => {
-        const linkText = match[1]
-        const url = match[2].replace('?utm_source=openai', '') // Clean up OpenAI tracking
-        const domain = new URL(url).hostname
-        
-        return {
-          title: linkText || domain,
-          url: url,
-          snippet: `Source from ${domain}`,
-          display_url: domain,
-          position: index + 1
-        }
-      })
+    // Parse URLs from the response and extract them as citations (only if no citations found in completion object)
+    if (citations.length === 0) {
+      const urlRegex = /\[([^\]]+)\]\(([^)]+)\)/g
+      const urlMatches = Array.from(rawResponse.matchAll(urlRegex))
       
-      // Remove any sources section from the AI-generated response to avoid duplication
-      // since we display citations separately with blue formatting
-      formattedResponse = formattedResponse.replace(/\n\n---\n\n\*\*Sources?:\*\*[\s\S]*$/i, '')
-      formattedResponse = formattedResponse.replace(/\n\n\*\*References?:\*\*[\s\S]*$/i, '')
-      formattedResponse = formattedResponse.replace(/\n\n\*\*Citations?:\*\*[\s\S]*$/i, '')
+      console.log('🔍 Found URL matches in text:', urlMatches.length)
+      
+      if (urlMatches.length > 0) {
+        citations = urlMatches.map((match, index) => {
+          const linkText = match[1]
+          const url = match[2].replace('?utm_source=openai', '') // Clean up OpenAI tracking
+          const domain = new URL(url).hostname
+          
+          return {
+            title: linkText || domain,
+            url: url,
+            snippet: `Source from ${domain}`,
+            display_url: domain,
+            position: index + 1
+          }
+        })
+        
+        console.log('✅ Extracted citations from text:', citations.length)
+        
+        // Remove any sources section from the AI-generated response to avoid duplication
+        // since we display citations separately with blue formatting
+        formattedResponse = formattedResponse.replace(/\n\n---\n\n\*\*Sources?:\*\*[\s\S]*$/i, '')
+        formattedResponse = formattedResponse.replace(/\n\n\*\*References?:\*\*[\s\S]*$/i, '')
+        formattedResponse = formattedResponse.replace(/\n\n\*\*Citations?:\*\*[\s\S]*$/i, '')
+      } else {
+        console.log('❌ No citations found in text')
+      }
+    } else {
+      console.log('✅ Using citations from completion object, skipping text parsing')
     }
     
     const response = formattedResponse
@@ -200,6 +226,9 @@ Please provide a helpful response to this follow-up question, taking into accoun
       console.error('Error saving follow-up answer:', saveAnswerError)
     }
 
+    console.log('📤 Returning response with citations:', citations.length)
+    console.log('📤 Final citations:', JSON.stringify(citations, null, 2))
+    
     return NextResponse.json({
       response,
       citations,

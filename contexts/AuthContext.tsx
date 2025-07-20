@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase'
 
 // Constants for localStorage keys and cache duration
 const AUTH_CACHE_KEY = 'medguard_auth_cache'
-const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
+const MIN_CHECK_INTERVAL = 5 * 60 * 1000 // 5 minutes minimum between checks
 
 // Interface for cached authentication data
 interface AuthCache {
@@ -14,6 +15,7 @@ interface AuthCache {
   isAdmin: boolean
   userId: string
   timestamp: number
+  lastChecked: number // Last time we checked with server
   version: number // For future cache invalidation if needed
 }
 
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(true)
   const [authCacheLoaded, setAuthCacheLoaded] = useState(false)
+  const [lastStatusCheck, setLastStatusCheck] = useState<number>(0)
   useEffect(() => {
     setIsClient(true)
   }, [])
@@ -65,6 +68,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
       
+      // Check if we need to refresh from server (but keep using cache)
+      const needsRefresh = Date.now() - (parsed.lastChecked || 0) > MIN_CHECK_INTERVAL
+      if (needsRefresh) {
+        console.log('⏰ Auth cache needs refresh from server')
+      }
+      
       return parsed
     } catch (error) {
       console.error('❌ Error reading auth cache:', error)
@@ -82,15 +91,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return
     
     try {
+      const now = Date.now()
       const cacheData: AuthCache = {
         isApproved,
         isAdmin,
         userId,
-        timestamp: Date.now(),
+        timestamp: now,
+        lastChecked: now,
         version: 1
       }
       
       localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(cacheData))
+      setLastStatusCheck(now)
       console.log('💾 Auth cache saved:', { isApproved, isAdmin, userId })
     } catch (error) {
       console.error('❌ Error saving auth cache:', error)
@@ -134,10 +146,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkApprovalStatus = useCallback(async (currentSession: Session, forceRefresh = false) => {
     console.log('🔍 Checking approval status for user:', currentSession.user?.email, { forceRefresh })
 
-    // If not forcing refresh, try to use cached data first
-    if (!forceRefresh && loadCachedAuthState(currentSession.user)) {
-      console.log('✅ Using cached auth state, skipping API call')
-      return
+    // Check if we've checked recently (unless forcing refresh)
+    if (!forceRefresh) {
+      const now = Date.now()
+      const timeSinceLastCheck = now - lastStatusCheck
+      
+      if (timeSinceLastCheck < MIN_CHECK_INTERVAL) {
+        console.log(`⏰ Skipping status check, last checked ${Math.round(timeSinceLastCheck / 1000)}s ago`)
+        return
+      }
+      
+      // Try to use cached data first
+      if (loadCachedAuthState(currentSession.user)) {
+        console.log('✅ Using cached auth state, skipping API call')
+        return
+      }
     }
 
     setApprovalLoading(true)
@@ -169,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Cache the successful response
       setAuthCache(data.isApproved, data.isAdmin, currentSession.user.id)
       setAuthCacheLoaded(true)
+      setLastStatusCheck(Date.now())
     } catch (error) {
       console.error('❌ Error checking approval status:', error)
       setIsApproved(false)
@@ -178,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🏁 Setting approvalLoading to false')
       setApprovalLoading(false)
     }
-  }, [loadCachedAuthState, setAuthCache])
+  }, [loadCachedAuthState, setAuthCache, lastStatusCheck])
 
   // Force refresh function for manual cache invalidation
   const refreshAuthState = useCallback(async () => {
@@ -190,8 +214,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔄 Force refreshing auth state...')
     clearAuthCache()
     setAuthCacheLoaded(false)
+    setLastStatusCheck(0)
     await checkApprovalStatus(session, true)
-  }, [session, clearAuthCache, checkApprovalStatus])
+  }, [session, clearAuthCache])
+
+  // Handle window visibility changes to prevent unnecessary checks
+  useEffect(() => {
+    if (!isClient) return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && session && user) {
+        const timeSinceLastCheck = Date.now() - lastStatusCheck
+        // Only check if it's been more than 15 minutes since last check
+        if (timeSinceLastCheck > 15 * 60 * 1000) {
+          console.log('👁️ Tab became visible, checking auth status after long absence')
+          checkApprovalStatus(session)
+        } else {
+          console.log('👁️ Tab became visible, but checked recently - skipping')
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [isClient, session, user, lastStatusCheck])
 
   useEffect(() => {
     if (!isClient) return
@@ -221,11 +267,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           window.history.replaceState({}, document.title, url.pathname + url.search)
         }
       }
+      
+      // Handle session expiry
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('🔄 Token refreshed, session is still valid')
+      } else if (event === 'SIGNED_OUT') {
+        console.log('🚪 User signed out, clearing auth state')
+        clearAuthCache()
+        setAuthCacheLoaded(false)
+        setLastStatusCheck(0)
+      }
     })
 
     return () => subscription.unsubscribe()
   }, [isClient])
 
+  // Handle user/session changes with debouncing to prevent excessive checks
   useEffect(() => {
     console.log('👤 User/session changed:', {
       hasUser: !!user,
@@ -247,17 +304,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check approval status for authenticated users
     if (session && user) {
       console.log('✅ User logged in, checking approval status...')
-      checkApprovalStatus(session)
+      // Use a timeout to debounce rapid session changes
+      const timeoutId = setTimeout(() => {
+        checkApprovalStatus(session)
+      }, 100)
+      
+      return () => clearTimeout(timeoutId)
     } else {
       console.log('❌ No user/session, resetting approval state')
       setIsApproved(false)
       setIsAdmin(false)
       setApprovalLoading(false)
       setAuthCacheLoaded(false)
+      setLastStatusCheck(0)
       // Clear cache when user logs out
       clearAuthCache()
     }
-  }, [session, user, isClient, clearAuthCache]) // Remove checkApprovalStatus from deps to avoid infinite loop
+  }, [session, user, isClient, clearAuthCache])
 
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -305,6 +368,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear auth cache before signing out
     clearAuthCache()
     setAuthCacheLoaded(false)
+    setLastStatusCheck(0)
     
     // Sign out from Supabase
     await supabase.auth.signOut()

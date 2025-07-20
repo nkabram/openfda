@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Collapsible animations */
+@keyframes collapsibleDown {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-collapsible-content-height); opacity: 1; }
+}
+
+@keyframes collapsibleUp {
+  from { height: var(--radix-collapsible-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
+.animate-collapsible-down {
+  animation: collapsibleDown 200ms ease-out;
+}
+
+.animate-collapsible-up {
+  animation: collapsibleUp 200ms ease-out;
+}
+
+/* Global styles */
+html, body, #__next {
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -10,42 +36,73 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    
+    /* Indigo primary colors */
+    --primary: 239 84% 67%;
     --primary-foreground: 210 40% 98%;
+    
     --secondary: 220 14.3% 95.9%;
     --secondary-foreground: 220.9 39.3% 11%;
     --muted: 220 14.3% 95.9%;
     --muted-foreground: 220 8.9% 46.1%;
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 220.9 39.3% 11%;
+    
+    /* Indigo accent colors */
+    --accent: 239 68% 95%;
+    --accent-foreground: 239 84% 67%;
+    
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 221.2 83.2% 53.3%;
+    
+    /* Ring color for focus states - indigo */
+    --ring: 239 84% 67%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* Custom background color #111113 */
+    --background: 240 7% 7%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    
+    /* Card backgrounds slightly lighter than main background */
+    --card: 240 6% 10%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    
+    /* Ensure background color is applied to the entire page */
+    background-color: #111113;
+    color: hsl(210 40% 98%);
+    
+    /* Popover backgrounds */
+    --popover: 240 6% 10%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
+    
+    /* Indigo primary colors */
+    --primary: 239 84% 67%;
+    --primary-foreground: 240 7% 7%;
+    
+    /* Secondary colors with subtle indigo tint */
+    --secondary: 240 6% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    
+    /* Muted colors */
+    --muted: 240 6% 15%;
+    --muted-foreground: 240 5% 65%;
+    
+    /* Indigo accent colors */
+    --accent: 239 68% 22%;
+    --accent-foreground: 239 84% 67%;
+    
+    /* Destructive colors */
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    
+    /* Border and input colors */
+    --border: 240 6% 20%;
+    --input: 240 6% 20%;
+    
+    /* Ring color for focus states - indigo */
+    --ring: 239 84% 67%;
   }
 }
 

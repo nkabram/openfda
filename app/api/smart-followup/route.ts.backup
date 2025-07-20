@@ -1,0 +1,436 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import OpenAI from 'openai'
+
+// Force this route to be dynamic (not statically generated)
+export const dynamic = 'force-dynamic'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase environment variables')
+}
+
+const supabase = createClient(supabaseUrl!, supabaseKey!)
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+interface SmartFollowUpRequest {
+  query: string
+  queryId: string
+  detectedIntent?: 'clarification' | 'fda_search' | 'web_search'
+  forceIntent?: 'clarification' | 'fda_search' | 'web_search'
+}
+
+// Helper function to map intent to follow_up_mode database values
+function mapIntentToFollowUpMode(intent: 'clarification' | 'fda_search' | 'web_search'): string {
+  switch (intent) {
+    case 'fda_search':
+      return 'fda_docs'
+    case 'web_search':
+      return 'websearch'
+    case 'clarification':
+      return 'llm_only'
+    default:
+      return 'llm_only'
+  }
+}
+
+// Helper function to get user from request
+async function getUserFromRequest(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) return null
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user } } = await supabase.auth.getUser(token)
+    return user
+  } catch (error) {
+    console.error('Error getting user:', error)
+    return null
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    console.log('🚀 Smart follow-up API called')
+    
+    // Get the auth token for passing to other endpoints
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const authToken = authHeader.replace('Bearer ', '')
+    
+    // Get the authenticated user
+    const user = await getUserFromRequest(request)
+    console.log('👤 User from request:', user?.id)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body: SmartFollowUpRequest = await request.json()
+    console.log('📝 Request body:', body)
+    const { query, queryId, detectedIntent, forceIntent } = body
+
+    if (!query?.trim() || !queryId) {
+      console.log('❌ Missing query or queryId')
+      return NextResponse.json(
+        { error: 'Query and queryId are required' },
+        { status: 400 }
+      )
+    }
+
+    // Get the original query and conversation context
+    console.log('🔍 Looking for query:', queryId, 'for user:', user.id)
+    const { data: originalQuery, error: queryError } = await supabase
+      .from('fda_queries')
+      .select('*')
+      .eq('id', queryId)
+      .eq('user_id', user.id)
+      .single()
+
+    console.log('📊 Query result:', { originalQuery: !!originalQuery, queryError })
+    if (queryError || !originalQuery) {
+      console.log('❌ Query not found or error:', queryError)
+      return NextResponse.json(
+        { error: 'Query not found or unauthorized' },
+        { status: 404 }
+      )
+    }
+
+    // Get previous messages for context
+    const { data: previousMessages } = await supabase
+      .from('fda_messages')
+      .select('*')
+      .eq('query_id', queryId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+
+    // Function to map detected intents to valid database follow_up_mode values
+    const mapIntentToFollowUpMode = (intent: string): string => {
+      switch (intent) {
+        case 'fda_search':
+          return 'fda_docs'
+        case 'web_search':
+          return 'websearch'
+        case 'clarification':
+        default:
+          return 'llm_only'
+      }
+    }
+
+    // Determine the intent to use
+    let finalIntent: 'clarification' | 'fda_search' | 'web_search' | undefined = forceIntent || detectedIntent
+    console.log('🎯 Initial intent:', { forceIntent, detectedIntent, finalIntent })
+
+    // If no intent provided, detect it
+    if (!finalIntent) {
+      console.log('🔍 Detecting intent for query:', query)
+      const intentResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/detect-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          conversationContext: previousMessages?.map(m => `${m.message_type}: ${m.content}`).join('\n'),
+          previousResponse: originalQuery.ai_response,
+          medicationName: originalQuery.medication_name
+        })
+      })
+
+      if (intentResponse.ok) {
+        const intentResult = await intentResponse.json()
+        finalIntent = intentResult.intent
+        console.log('✅ Intent detected:', finalIntent)
+      } else {
+        console.log('❌ Intent detection failed, using fallback')
+        finalIntent = 'clarification' // fallback
+      }
+    }
+    
+    console.log('🎯 Final intent to use:', finalIntent)
+    
+    // Enhanced intent detection for FDA vs Web search
+    let isWebSearchIntent = false
+    
+    // Check if user explicitly wants web search
+    if (forceIntent === 'web_search') {
+      isWebSearchIntent = true
+      console.log('🔍 Forced web search intent')
+    } else {
+      // Detect intent using keywords
+      const queryLower = query.toLowerCase()
+      
+      // Web search keywords - current research, studies, news
+      const webSearchKeywords = [
+        'studies', 'research', 'latest', 'recent', 'current', 'new',
+        'clinical trials', 'trials', 'evidence', 'findings', 'data',
+        'published', 'literature', 'papers', 'articles', 'news',
+        'updates', 'developments', 'breakthrough', 'discovery',
+        'compare', 'comparison', 'versus', 'vs', 'alternative',
+        'review', 'meta-analysis', 'systematic review'
+      ]
+      
+      isWebSearchIntent = webSearchKeywords.some(keyword => 
+        queryLower.includes(keyword)
+      )
+      
+      if (isWebSearchIntent) {
+        console.log('🔍 Detected web search keywords')
+      } else {
+        console.log('🏥 Detected FDA-related query')
+      }
+    }
+
+    // Step 2: Save the follow-up question
+    const followUpMode = isWebSearchIntent ? 'websearch' : 'llm_only'
+    const { data: questionMessage, error: questionError } = await supabase
+      .from('fda_messages')
+      .insert({
+        query_id: queryId,
+        user_id: user.id,
+        message_type: 'question',
+        content: query,
+        follow_up_mode: followUpMode
+      })
+      .select()
+      .single()
+
+    if (questionError) {
+      console.error('Error saving question:', questionError)
+      return NextResponse.json(
+        { error: 'Failed to save question' },
+        { status: 500 }
+      )
+    }
+
+    let responseContent = ''
+    let citations: any[] = []
+    let websearchUsed = false
+
+    // Step 3: Handle the query based on intent
+    if (isWebSearchIntent) {
+      // Web search intent - use web search directly
+      console.log('🌐 Processing web search request')
+      const webSearchResult = await handleWebSearch(query, originalQuery, authToken)
+      responseContent = webSearchResult.content
+      citations = webSearchResult.citations || []
+      websearchUsed = true
+    } else {
+      // FDA-related intent - try saved data first, then new search if needed
+      console.log('🏥 Processing FDA-related request')
+      
+      // First try to answer from saved FDA data
+      const savedDataResponse = await tryAnswerFromSavedData(query, originalQuery, previousMessages || [])
+      
+      if (savedDataResponse.canAnswer) {
+        console.log('✅ Answered from saved FDA data')
+        responseContent = savedDataResponse.content
+        citations = savedDataResponse.citations || []
+        websearchUsed = false
+      } else {
+        console.log('❌ Cannot answer from saved data, performing new FDA search')
+        // Need new FDA search - this should trigger streaming progress
+        const fdaSearchResult = await handleFdaSearch(query, originalQuery, authToken)
+        responseContent = fdaSearchResult.content
+        citations = fdaSearchResult.citations || []
+        websearchUsed = false
+      }
+    }
+
+    if (responseContent.includes('I apologize, but I was unable to') || 
+        responseContent.includes('No web search results found') ||
+        citations.length === 0) {
+      console.log('⚠️ Web search returned insufficient results, offering alternatives')
+      return NextResponse.json({
+        needsConfirmation: true,
+        intent: 'fda_search',
+        message: 'I couldn\'t find current web information for your question. Would you like me to search the FDA database for official drug information instead?',
+        questionId: questionMessage.id
+      })
+            message: 'I couldn\'t find current web information for your question. Would you like me to search the FDA database for official drug information instead?',
+            questionId: questionMessage.id
+          })
+        }
+        break
+        
+      default:
+        responseContent = await handleClarification(query, originalQuery, previousMessages || [])
+    }
+
+    // Save the response
+    const { data: answerMessage, error: answerError } = await supabase
+      .from('fda_messages')
+      .insert({
+        query_id: queryId,
+        user_id: user.id,
+        message_type: 'answer',
+        content: responseContent,
+        citations: citations.length > 0 ? citations : null,
+        websearch_enabled: websearchUsed,
+        follow_up_mode: followUpMode
+      })
+      .select()
+      .single()
+
+    if (answerError) {
+      console.error('Error saving answer:', answerError)
+      return NextResponse.json(
+        { error: 'Failed to save answer' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      intent: finalIntent,
+      questionId: questionMessage.id,
+      answerId: answerMessage.id,
+      response: responseContent,
+      citations,
+      websearchUsed
+    })
+
+  } catch (error) {
+    console.error('🔥 Smart follow-up error:', error)
+    console.error('🔥 Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    console.error('🔥 Error message:', error instanceof Error ? error.message : String(error))
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    )
+  }
+}
+
+async function handleClarification(query: string, originalQuery: any, previousMessages: any[]) {
+  const conversationHistory = previousMessages?.map(m => 
+    `${m.message_type === 'question' ? 'User' : 'Assistant'}: ${m.content}`
+  ).join('\n') || ''
+
+  const systemPrompt = `You are a helpful medical information assistant. The user is asking a follow-up question about a previous medication query response. 
+
+Original Query: "${originalQuery.user_query}"
+Medication: ${originalQuery.medication_name || 'Not specified'}
+Previous Response: "${originalQuery.ai_response}"
+
+${conversationHistory ? `Previous Conversation:\n${conversationHistory}` : ''}
+
+Please provide a helpful clarification or additional information based on the context above. Keep your response focused and relevant to the user's follow-up question.
+
+IMPORTANT: Format your response with a "Bottom line:" summary at the end, followed by detailed explanation if needed. Always include appropriate medical disclaimers and remind users to consult healthcare professionals for medical decisions.
+
+Example format:
+[Detailed explanation here]
+
+Bottom line: [One sentence summary of the key point]`
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: query }
+    ],
+    temperature: 0.7,
+    max_tokens: 800,
+  })
+
+  return completion.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response. Please try rephrasing your question.'
+}
+
+async function handleFdaSearch(query: string, originalQuery: any, authToken: string) {
+  try {
+    console.log('🔍 handleFdaSearch called with:', { query, queryId: originalQuery.id })
+    
+    // Use the existing FDA search functionality
+    const searchResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/follow-up-fda`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        followUpQuestion: query,
+        queryId: originalQuery.id,
+        mode: 'fda_docs'
+      })
+    })
+
+    console.log('🔍 FDA search response status:', searchResponse.status)
+    
+    if (searchResponse.ok) {
+      const result = await searchResponse.json()
+      console.log('✅ FDA search successful:', { 
+        responseLength: result.response?.length,
+        citationsCount: result.citations?.length 
+      })
+      return {
+        content: result.response || 'No FDA search results found.',
+        citations: result.citations || []
+      }
+    } else {
+      const errorText = await searchResponse.text()
+      console.log('❌ FDA search failed:', { status: searchResponse.status, error: errorText })
+      return {
+        content: 'I apologize, but I was unable to perform an FDA search at this time. Please try again later.',
+        citations: []
+      }
+    }
+  } catch (error) {
+    console.error('❌ FDA search error:', error)
+    return {
+      content: 'I apologize, but I encountered an error while searching the FDA database. Please try again later.',
+      citations: []
+    }
+  }
+}
+
+async function handleWebSearch(query: string, originalQuery: any, authToken: string) {
+  try {
+    console.log('🔍 handleWebSearch called with:', { query, queryId: originalQuery.id })
+    
+    // Use the existing web search functionality
+    const searchResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/follow-up-websearch`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        followUpQuestion: query,
+        queryId: originalQuery.id,
+        medication: originalQuery.medication_name,
+        previousResponse: originalQuery.ai_response
+      })
+    })
+
+    console.log('🔍 Web search response status:', searchResponse.status)
+    
+    if (searchResponse.ok) {
+      const result = await searchResponse.json()
+      console.log('✅ Web search successful:', { 
+        responseLength: result.response?.length,
+        citationsCount: result.citations?.length 
+      })
+      return {
+        content: result.response || 'No web search results found.',
+        citations: result.citations || []
+      }
+    } else {
+      const errorText = await searchResponse.text()
+      console.log('❌ Web search failed:', { status: searchResponse.status, error: errorText })
+      return {
+        content: 'I apologize, but I was unable to perform a web search at this time. Please try again later.',
+        citations: []
+      }
+    }
+  } catch (error) {
+    console.error('❌ Web search error:', error)
+    return {
+      content: 'I apologize, but I encountered an error while searching the web. Please try again later.',
+      citations: []
+    }
+  }
+}

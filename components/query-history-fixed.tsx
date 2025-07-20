@@ -164,7 +164,7 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId,
                     {truncateText(query.user_query, 85)}
                   </h3>
                   {query.medication_name ? (
-                    <div className="flex items-center gap-1 text-xs text-primary font-medium shrink-0">
+                    <div className="flex items-center gap-1 text-xs font-medium shrink-0 text-blue-600 dark:text-blue-400">
                       <Pill className="w-3 h-3" />
                       <span className="truncate max-w-20">{query.medication_name}</span>
                     </div>
@@ -182,15 +182,6 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId,
                   <Calendar className="w-3 h-3 mr-1" />
                   <span>{formatDate(query.created_at)}</span>
                 </div>
-                
-                {query.message_count && query.message_count > 0 ? (
-                  <div className="flex items-center gap-1 text-blue-500">
-                    <MessageSquare className="w-3 h-3" />
-                    <span className="font-medium">{query.message_count}</span>
-                  </div>
-                ) : (
-                  <div></div>
-                )}
                 <AlertDialog>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

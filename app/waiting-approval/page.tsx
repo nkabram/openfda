@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { Loader2, RefreshCw, LogOut } from 'lucide-react'
 
 export default function WaitingForApproval() {
-  const { user, signOut, checkApprovalStatus, isApproved, isAdmin, loading: authLoading, approvalLoading } = useAuth()
+  const { user, signOut, checkApprovalStatus, refreshAuthState, isApproved, isAdmin, loading: authLoading, approvalLoading } = useAuth()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,8 +72,15 @@ export default function WaitingForApproval() {
   const handleRefresh = async () => {
     setLoading(true)
     setError(null)
-    await checkApprovalStatus()
-    setLoading(false)
+    try {
+      // Force a refresh by calling the auth context refresh method
+      await refreshAuthState()
+    } catch (err) {
+      setError('Failed to refresh approval status. Please try again.')
+      console.error('Error refreshing approval status:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleLogout = async () => {

@@ -1,0 +1,194 @@
+# Smart Follow-Up Input System - Product Requirements Document
+
+## Project Overview
+Transform the current multi-button follow-up toolbar into a single, intelligent input area that automatically determines user intent and routes queries appropriately without requiring users to pre-select their desired action type.
+
+## Current State Analysis
+- Users must choose between three follow-up modes: FDA Docs, Web Search, and LLM Only
+- This creates friction and decision fatigue
+- Users may not know which option is best for their query
+- Multiple UI elements create visual clutter
+
+## Goals and Objectives
+
+### Primary Goals
+1. **Simplify User Experience**: Replace toolbar buttons with single input field
+2. **Intelligent Routing**: Automatically determine user intent and route accordingly
+3. **Reduce Cognitive Load**: Eliminate need for users to choose follow-up type
+4. **Maintain Functionality**: Preserve all current capabilities while improving UX
+
+### Success Metrics
+- Reduced user hesitation time before submitting follow-up questions
+- Increased follow-up question engagement rate
+- Improved user satisfaction scores
+- Reduced support requests about which follow-up option to choose
+
+## Functional Requirements
+
+### 1. Single Input Interface
+- Replace current toolbar with single text input area
+- Include submit button or Enter key functionality
+- Maintain responsive design across devices
+- Preserve accessibility features
+
+### 2. Smart Intent Detection System
+The system must classify user queries into three categories:
+
+#### 2.1 Clarification/Additional Questions (LLM Only)
+**Intent Indicators:**
+- Questions about previously generated content
+- Requests for explanation or clarification
+- "What does this mean?", "Can you explain...", "Tell me more about..."
+- References to specific parts of previous response
+
+**Action:** Process using LLM with conversation context
+
+#### 2.2 New FDA Data Request
+**Intent Indicators:**
+- New medication names mentioned
+- Requests for different drug information
+- "What about [drug name]?", "Tell me about [medication]"
+- Dosage, interaction, or safety questions for new substances
+
+**Action:** Present "New FDA Search" button for user confirmation
+
+#### 2.3 Web Search Request
+**Intent Indicators:**
+- Current events or recent news requests
+- Comparative studies or research requests
+- "Latest research on...", "Recent studies about...", "Current guidelines for..."
+- Questions requiring real-time or external information
+
+**Action:** Automatically perform web search
+
+### 3. Intent Classification Logic
+
+#### 3.1 Primary Classification
+- Use NLP model to analyze query text
+- Consider conversation context and previous responses
+- Apply confidence scoring to classification results
+
+#### 3.2 Confidence Thresholds
+- **High Confidence (>80%)**: Execute action automatically
+- **Medium Confidence (50-80%)**: Present clarification options
+- **Low Confidence (<50%)**: Default to LLM response with option to retry
+
+#### 3.3 Ambiguity Handling
+When intent is unclear, present minimal clarification UI:
+- "I can help you with that. Would you like me to:"
+- Option 1: "Search for new FDA information"
+- Option 2: "Search the web for recent information"
+- Option 3: "Answer based on the previous response"
+
+### 4. Backend API Requirements
+
+#### 4.1 New Intent Detection Endpoint
+- **Endpoint**: `/api/detect-intent`
+- **Method**: POST
+- **Input**: 
+  - User query text
+  - Conversation context
+  - Previous response content
+- **Output**:
+  - Intent classification (clarification/fda/websearch)
+  - Confidence score
+  - Suggested action
+
+#### 4.2 Unified Follow-Up Endpoint
+- **Endpoint**: `/api/smart-followup`
+- **Method**: POST
+- **Input**:
+  - User query
+  - Detected intent
+  - Query context
+- **Output**:
+  - Response content
+  - Action taken
+  - Suggested follow-ups
+
+### 5. User Experience Flow
+
+#### 5.1 Happy Path - High Confidence
+1. User types follow-up question
+2. System detects intent with high confidence
+3. System automatically executes appropriate action
+4. Response displayed with minimal delay
+
+#### 5.2 Ambiguous Intent Path
+1. User types follow-up question
+2. System detects multiple possible intents
+3. Brief clarification UI appears
+4. User selects preferred action
+5. System executes and remembers preference for similar queries
+
+#### 5.3 Error Handling
+1. If intent detection fails, default to LLM response
+2. Provide "Try a different approach" options
+3. Allow manual override of detected intent
+
+## Technical Requirements
+
+### 1. Intent Detection Model
+- Implement using OpenAI GPT for initial version
+- Consider fine-tuning for medication-specific queries
+- Include context awareness for conversation history
+
+### 2. API Architecture
+- Maintain backward compatibility during transition
+- Implement proper error handling and fallbacks
+- Add logging for intent detection accuracy monitoring
+
+### 3. Frontend Components
+- Create new `SmartFollowUpInput` component
+- Update `MedicationQueryForm` to use new component
+- Remove existing toolbar components
+- Maintain loading states and progress indicators
+
+### 4. Performance Requirements
+- Intent detection should complete within 500ms
+- Total response time should not exceed current performance
+- Implement caching for common query patterns
+
+## Implementation Phases
+
+### Phase 1: Backend Intent Detection
+- Implement intent detection API endpoint
+- Create classification logic using OpenAI
+- Add confidence scoring system
+- Test with sample queries
+
+### Phase 2: Frontend Component
+- Create new input component
+- Implement clarification UI for ambiguous cases
+- Update main form to use new component
+- Remove old toolbar components
+
+### Phase 3: Integration and Testing
+- Connect frontend to backend APIs
+- Implement error handling and fallbacks
+- Add analytics for intent detection accuracy
+- User testing and feedback collection
+
+### Phase 4: Optimization
+- Fine-tune intent detection based on usage data
+- Optimize performance and response times
+- Add advanced features like query suggestions
+- Monitor and improve accuracy metrics
+
+## Success Criteria
+1. **Usability**: 90% of users can successfully submit follow-up questions without confusion
+2. **Accuracy**: Intent detection accuracy >85% for clear queries
+3. **Performance**: No degradation in response times
+4. **Adoption**: Increased follow-up question usage by 25%
+
+## Risk Mitigation
+- **Intent Misclassification**: Provide easy correction mechanism
+- **Performance Impact**: Implement caching and optimization
+- **User Confusion**: Include subtle UI hints and help text
+- **Fallback Strategy**: Always allow manual override of detected intent
+
+## Future Enhancements
+- Learning from user corrections to improve accuracy
+- Personalized intent detection based on user history
+- Voice input support for follow-up questions
+- Multi-language intent detection support

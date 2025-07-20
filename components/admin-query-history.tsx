@@ -146,7 +146,7 @@ export function AdminQueryHistory({ onCreatePersonalQuery, selectedQuery, onSele
                       {/* Metadata */}
                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         {query.medication_name && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                             <Pill className="h-3 w-3" />
                             <span>{query.medication_name}</span>
                           </div>
