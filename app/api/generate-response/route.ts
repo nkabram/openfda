@@ -82,10 +82,15 @@ interface OpenFDAResponse {
 }
 
 async function searchMedicationInOpenFDA(medicationName: string, limit: number = 5): Promise<OpenFDAResponse | null> {
+  console.log(`🏥 Starting FDA search for medication: "${medicationName}" (limit: ${limit})`)
+  
   try {
     const cleanMedication = medicationName.trim().toLowerCase()
     const apiKey = process.env.OPENFDA_API_KEY
     const baseUrl = 'https://api.fda.gov/drug/label.json'
+    
+    console.log(`🔍 Cleaned medication name: "${cleanMedication}"`)
+    console.log(`🔑 API Key available: ${apiKey ? 'Yes' : 'No'}`)
     
     const searchQueries = [
       `openfda.generic_name:"${cleanMedication}"`,
@@ -93,22 +98,71 @@ async function searchMedicationInOpenFDA(medicationName: string, limit: number =
       `openfda.generic_name:${cleanMedication}`,
       `openfda.brand_name:${cleanMedication}`
     ]
+    
+    console.log(`📋 Trying ${searchQueries.length} search strategies`)
 
-    for (const searchQuery of searchQueries) {
+    for (let i = 0; i < searchQueries.length; i++) {
+      const searchQuery = searchQueries[i]
       const url = `${baseUrl}?search=${encodeURIComponent(searchQuery)}&limit=${limit}${apiKey ? `&api_key=${apiKey}` : ''}`
       
+      console.log(`🔍 Strategy ${i + 1}/${searchQueries.length}: ${searchQuery}`)
+      console.log(`🌐 FDA API URL: ${url.replace(apiKey || '', '***API_KEY***')}`)
+      
+      const startTime = Date.now()
       const response = await fetch(url)
+      const responseTime = Date.now() - startTime
+      
+      console.log(`⏱️ FDA API response time: ${responseTime}ms`)
+      console.log(`📊 Response status: ${response.status} ${response.statusText}`)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log(`📦 Response data structure:`, {
+          hasResults: !!data.results,
+          resultCount: data.results?.length || 0,
+          hasError: !!data.error
+        })
+        
         if (data.results && data.results.length > 0) {
+          console.log(`✅ FDA search successful! Found ${data.results.length} results in ${responseTime}ms`)
+          
+          // Log summary of first result
+          const firstResult = data.results[0]
+          console.log(`📋 First result summary:`, {
+            brandNames: firstResult.openfda?.brand_name?.slice(0, 3) || [],
+            genericNames: firstResult.openfda?.generic_name?.slice(0, 3) || [],
+            manufacturer: firstResult.openfda?.manufacturer_name?.[0] || 'Unknown',
+            availableSections: Object.keys(firstResult).filter(key => 
+              ['indications_and_usage', 'dosage_and_administration', 'contraindications', 
+               'warnings_and_cautions', 'adverse_reactions', 'drug_interactions'].includes(key)
+            )
+          })
+          
           return data
+        } else {
+          console.log(`⚠️ Strategy ${i + 1} returned no results`)
+        }
+      } else {
+        console.log(`❌ Strategy ${i + 1} failed: ${response.status} ${response.statusText}`)
+        
+        if (response.status === 429) {
+          console.log(`🚫 Rate limit detected! Consider adding delays between requests.`)
+        }
+        
+        try {
+          const errorData = await response.json()
+          console.log(`🔥 Error details:`, errorData)
+        } catch (e) {
+          console.log(`🔥 Could not parse error response`)
         }
       }
     }
 
+    console.log(`❌ All FDA search strategies exhausted. No results found for "${medicationName}"`)
     return null
   } catch (error) {
-    console.error('Error searching OpenFDA:', error)
+    console.error('🔥 Error searching OpenFDA:', error)
+    console.error('🔥 Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
     return null
   }
 }
@@ -243,7 +297,7 @@ Please provide a helpful response to the user's question, focusing on the specif
         }
       ],
       temperature: 0.1,
-      max_tokens: 2000,
+      max_tokens: 4000,
     })
 
     const response = completion.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response to your question.'

@@ -402,14 +402,14 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       {/* Response Section */}
       {response && (
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-semibold">Response</span>
-            {response.medication && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">for {response.medication}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-semibold">Response</span>
+                {response.medication && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">for {response.medication}</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
           
           {(() => {
             const { bottomLine, restOfText } = parseBottomLine(response.response)
@@ -476,56 +476,81 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                             </ReactMarkdown>
                           </div>
                           
-                          {/* FDA Data Source Info - Moved inside details */}
-                          {response.fdaData && response.fdaData.results && (
+                          {/* FDA Citations */}
+                          {(response.fdaData || response.fdaSections) && (
                             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600">
                               <div className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
                                 <div className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-blue-700 dark:text-blue-300 font-medium">
-                                  FDA SOURCE
+                                  FDA SOURCES
                                 </div>
                                 <div className="flex-1">
-                                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                  <div className="mt-4 space-y-2">
+                                    {(() => {
+                                      // Generate FDA citations from the sections used
+                                      const fdaCitations = response.fdaSections?.map((section, index) => ({
+                                        id: index + 1,
+                                        title: `FDA ${section.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`,
+                                        url: `https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${encodeURIComponent(response.medication || '')}`,
+                                        snippet: `Official FDA information from ${section.replace(/_/g, ' ')} section for ${response.medication}`,
+                                        display_url: 'dailymed.nlm.nih.gov'
+                                      })) || []
+                                      
+                                      // Add general FDA source if no specific sections
+                                      if (fdaCitations.length === 0) {
+                                        fdaCitations.push({
+                                          id: 1,
+                                          title: `FDA Drug Information for ${response.medication}`,
+                                          url: `https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${encodeURIComponent(response.medication || '')}`,
+                                          snippet: `Official FDA drug labeling information for ${response.medication}`,
+                                          display_url: 'dailymed.nlm.nih.gov'
+                                        })
+                                      }
+                                      
+                                      return fdaCitations.map((citation) => (
+                                        <div key={citation.id} className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                                          <div className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-xs font-medium">
+                                            {citation.id}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <a
+                                              href={citation.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline line-clamp-2"
+                                            >
+                                              {citation.title}
+                                            </a>
+                                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">
+                                              {citation.snippet}
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-2">
+                                              <span className="text-xs text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                                                {citation.display_url}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))
+                                    })()}
+                                  </div>
+                                  <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
                                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                                      This response was generated using data from the FDA. For complete and official information, please refer to the official labeling.
+                                      This response was generated using official FDA data. For complete and up-to-date information, please refer to the official labeling.
                                     </p>
-                                    <div className="mt-2 text-xs">
-                                      <a 
-                                        href={`https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${response.medication}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline font-medium"
-                                      >
-                                        View official FDA labeling on DailyMed →
-                                      </a>
-                                    </div>
                                   </div>
 
                                   <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                                     <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">FDA Sections Used:</h4>
                                     <ul className="flex flex-wrap gap-2">
                                       {response.fdaSections?.map((section, index) => (
-                                        <li key={index} className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded px-2 py-1 font-mono">
-                                          {section}
+                                        <li key={index} className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded px-2 py-1">
+                                          {section.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                         </li>
                                       )) || []}
                                     </ul>
                                   </div>
 
-                                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">Suggested Questions:</h4>
-                                    <ul className="list-disc pl-5 space-y-1">
-                                      {response.intents.map((intent, index) => (
-                                        <li key={index} className="text-sm">
-                                          <button 
-                                            onClick={() => handleSuggestedQuestion(intent)}
-                                            className="text-left w-full text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                                          >
-                                            {intent}
-                                          </button>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
+
                                 </div>
                               </div>
                             </div>
@@ -538,12 +563,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
               </div>
             )
           })()}
-        </div>
-      )}
 
-      {/* Follow-up Messages */}
-      {followUpMessages && followUpMessages.length > 0 && (
-        <div className="space-y-6">
           {followUpMessages.map((message) => (
             <div key={message.id} className="space-y-3">
               {message.type === 'question' && (
@@ -728,8 +748,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                 </p>
               </div>
             </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
       )}
       
       {/* Smart Follow-up Input */}

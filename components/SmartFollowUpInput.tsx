@@ -319,17 +319,19 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
   const progressPercentage = (completedSteps.length / progressSteps.length) * 100
 
   return (
-    <div className="space-y-4">
-      {/* Intent Confirmation Dialog */}
-      {showConfirmation && (
-        <IntentConfirmation
-          intent={showConfirmation.intent}
-          message={showConfirmation.message}
-          onConfirm={handleConfirmIntent}
-          onCancel={handleCancel}
-          onAlternative={handleAlternativeIntent}
-        />
-      )}
+    <Card className="border-0 shadow-none">
+      <CardContent className="p-6 bg-background">
+        <div className="space-y-4">
+          {/* Intent Confirmation Dialog */}
+          {showConfirmation && (
+            <IntentConfirmation
+              intent={showConfirmation.intent}
+              message={showConfirmation.message}
+              onConfirm={handleConfirmIntent}
+              onCancel={handleCancel}
+              onAlternative={handleAlternativeIntent}
+            />
+          )}
 
       {/* Progress Indicator */}
       {isLoading && (
@@ -369,6 +371,8 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
           disabled={isLoading || disabled}
         />
       </form>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
