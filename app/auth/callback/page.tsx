@@ -19,10 +19,19 @@ export default function AuthCallback() {
 
     const handleAuthCallback = async () => {
       try {
+        console.log('🔄 Auth callback started')
+        console.log('🌐 Current URL:', window.location.href)
+        console.log('🌐 Origin:', window.location.origin)
+        console.log('🌐 Hash:', window.location.hash)
+        console.log('🌐 Search:', window.location.search)
+        
         // Get the URL hash/fragment which contains the OAuth tokens
         const hashParams = new URLSearchParams(window.location.hash.substring(1))
         const accessToken = hashParams.get('access_token')
         const refreshToken = hashParams.get('refresh_token')
+        
+        console.log('🔑 Access token present:', !!accessToken)
+        console.log('🔑 Refresh token present:', !!refreshToken)
         
         if (accessToken) {
           // Exchange the tokens for a session
@@ -40,18 +49,22 @@ export default function AuthCallback() {
           }
 
           if (data.session) {
-            console.log('Auth callback successful, redirecting to home')
+            console.log('✅ Auth callback successful, session created')
+            console.log('👤 User:', data.session.user.email)
+            console.log('↩️ Redirecting to home page')
             // Clean redirect to home page without URL fragments
             window.history.replaceState({}, document.title, '/')
             router.push('/')
           } else {
-            console.log('No session created, redirecting to home')
+            console.log('⚠️ No session created, redirecting to home')
             window.history.replaceState({}, document.title, '/')
             router.push('/')
           }
         } else {
+          console.log('⚠️ No access token in URL hash')
           // No tokens in URL, try to get existing session
           const { data, error } = await supabase.auth.getSession()
+          console.log('🔍 Existing session check:', !!data.session)
           
           if (error) {
             console.error('Auth callback error:', error)

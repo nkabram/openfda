@@ -220,7 +220,13 @@ function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: Smart
       })
 
       if (!response.ok) {
-        throw new Error('Failed to process follow-up')
+        const errorText = await response.text()
+        console.error('Smart follow-up API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        })
+        throw new Error(`Failed to process follow-up: ${response.status} ${response.statusText}`)
       }
 
       updateStepStatus('process', 'completed')
@@ -230,6 +236,7 @@ function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: Smart
       await new Promise(resolve => setTimeout(resolve, 300))
       
       const result = await response.json()
+      console.log('Smart follow-up result:', result)
 
       if (result.needsConfirmation) {
         // Show confirmation dialog for ambiguous intent
@@ -267,6 +274,10 @@ function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: Smart
 
     } catch (error) {
       console.error('Follow-up error:', error)
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      })
       
       // Mark current active step as error
       const activeStep = progressSteps.find(step => step.status === 'active')
@@ -274,9 +285,10 @@ function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: Smart
         updateStepStatus(activeStep.id, 'error')
       }
       
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       toast({
         title: 'Error',
-        description: 'Failed to process your follow-up question. Please try again.',
+        description: `Failed to process your follow-up question: ${errorMessage}`,
         variant: 'destructive',
       })
     } finally {

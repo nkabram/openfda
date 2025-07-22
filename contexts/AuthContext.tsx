@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { getAuthConfig } from '@/lib/auth-utils'
 
 // Constants for localStorage keys and cache duration
 const AUTH_CACHE_KEY = 'medguard_auth_cache'
@@ -344,16 +345,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session, user, isClient, clearAuthCache])
 
   const signInWithGoogle = async () => {
+    const authConfig = getAuthConfig()
+    
+    console.log('🔑 Starting Google OAuth sign in...')
+    console.log('🌐 Current origin:', window.location.origin)
+    console.log('↩️ Redirect URL:', authConfig.redirectUrl)
+    console.log('🛠️ Development mode:', authConfig.isDevelopment)
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { 
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          prompt: 'select_account'
-        }
+        redirectTo: authConfig.redirectUrl,
+        queryParams: authConfig.queryParams
       },
     })
-    if (error) console.error('Error signing in:', error.message)
+    
+    if (error) {
+      console.error('❌ Error signing in with Google:', error.message)
+      console.error('❌ Error details:', error)
+      
+      // If it's a redirect URL error, provide helpful information
+      if (error.message.includes('redirect') || error.message.includes('URL')) {
+        console.error('🚨 REDIRECT URL ERROR:')
+        console.error('🚨 Make sure the following URL is added to your Supabase project\'s OAuth settings:')
+        console.error('🚨', authConfig.redirectUrl)
+        console.error('🚨 Go to: Supabase Dashboard > Authentication > URL Configuration > Redirect URLs')
+      }
+    } else {
+      console.log('✅ Google OAuth initiated successfully')
+    }
   }
 
   const signInWithEmail = async (email: string, password: string) => {
@@ -379,9 +399,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
+    const authConfig = getAuthConfig()
+    const resetUrl = authConfig.redirectUrl.replace('/auth/callback', '/reset-password')
+    
+    console.log('🔄 Sending password reset email to:', email)
+    console.log('↩️ Reset redirect URL:', resetUrl)
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: resetUrl,
     })
+    
+    if (error) {
+      console.error('❌ Password reset error:', error)
+    } else {
+      console.log('✅ Password reset email sent successfully')
+    }
+    
     return { error }
   }
 

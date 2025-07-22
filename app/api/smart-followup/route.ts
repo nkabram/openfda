@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
+import { getBaseUrl } from '@/lib/url-utils'
 
 // Force this route to be dynamic (not statically generated)
 export const dynamic = 'force-dynamic'
@@ -262,12 +263,16 @@ export async function POST(request: NextRequest) {
     let websearchUsed = false
     let savedDataResponse: any = null
 
+    // Get the base URL from request headers for proper production support
+    const baseUrl = getBaseUrl(request)
+
     // Step 3: Handle the query based on intent
     if (isWebSearchIntent) {
       // Web search intent - use web search directly
       console.log('🌐 Processing web search request')
       try {
-        const webSearchResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/follow-up-websearch`, {
+        
+        const webSearchResponse = await fetch(`${baseUrl}/api/follow-up-websearch`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -320,7 +325,7 @@ export async function POST(request: NextRequest) {
         try {
           // Step 1: Extract medication and intent from the follow-up query
           console.log('🔍 Step 1: Extracting medication and intent from query')
-          const extractResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/extract-medication`, {
+          const extractResponse = await fetch(`${baseUrl}/api/extract-medication`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json'
@@ -346,7 +351,7 @@ export async function POST(request: NextRequest) {
           } else {
             // Step 2: Perform full FDA search using generate-response workflow
             console.log(`🏥 Step 2: Performing FDA search for medication: ${medication}`)
-            const generateResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/generate-response`, {
+            const generateResponse = await fetch(`${baseUrl}/api/generate-response`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',
@@ -356,8 +361,8 @@ export async function POST(request: NextRequest) {
                 query: query,
                 medication: medication,
                 fdaSections: fdaSections,
-                isFollowUp: true,
-                originalQueryId: originalQuery.id
+                saveToDatabase: false, // Smart follow-up handles its own database saving
+                intents: extractResult.intents || []
               })
             })
 
@@ -367,8 +372,8 @@ export async function POST(request: NextRequest) {
               responseContent = result.response || 'No FDA search results found.'
               
               // Generate FDA citations based on the sections searched
-              citations = fdaSections?.map((section, index) => ({
-                title: `FDA ${section.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`,
+              citations = fdaSections?.map((section: string, index: number) => ({
+                title: `FDA ${section.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}`,
                 url: `https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${encodeURIComponent(medication || '')}`,
                 snippet: `Official FDA information from ${section.replace(/_/g, ' ')} section for ${medication}`,
                 display_url: 'dailymed.nlm.nih.gov'
@@ -499,6 +504,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Return success response
+    console.log('✅ Smart follow-up completed successfully')
+    console.log('📊 Final response stats:', {
+      responseLength: responseContent.length,
+      citationsCount: citations?.length || 0,
+      intent: isWebSearchIntent ? 'web_search' : 'fda_search',
+      websearchUsed,
+      performedNewSearch: !savedDataResponse?.canAnswer && !isWebSearchIntent
+    })
+    
     return NextResponse.json({
       response: responseContent,
       intent: isWebSearchIntent ? 'web_search' : 'fda_search',
@@ -511,8 +525,23 @@ export async function POST(request: NextRequest) {
     console.error('🔥 Smart follow-up error:', error)
     console.error('🔥 Error stack:', error instanceof Error ? error.stack : 'No stack trace')
     console.error('🔥 Error message:', error instanceof Error ? error.message : String(error))
+    console.error('🔥 Error type:', typeof error)
+    console.error('🔥 Error constructor:', error?.constructor?.name)
+    
+    // Return detailed error for debugging
+    const errorDetails = {
+      message: error instanceof Error ? error.message : String(error),
+      type: typeof error,
+      constructor: error?.constructor?.name,
+      stack: error instanceof Error ? error.stack : undefined
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
+      { 
+        error: 'Internal server error', 
+        details: errorDetails,
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     )
   }
