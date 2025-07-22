@@ -40,66 +40,126 @@ async function getUserFromRequest(request: NextRequest) {
 }
 
 // Function to try answering from saved FDA data
-async function tryAnswerFromSavedData(query: string, originalQuery: any, previousMessages: any[]) {
-  const conversationHistory = previousMessages?.map(m => 
-    `${m.message_type === 'question' ? 'User' : 'Assistant'}: ${m.content}`
-  ).join('\n') || ''
-
-  // Check if we have saved FDA data
-  const fdaData = originalQuery.fda_raw_data
-  const fdaSections = originalQuery.fda_sections_used || []
-  
-  if (!fdaData || Object.keys(fdaData).length === 0) {
-    return { canAnswer: false, content: '', citations: [] }
-  }
-
-  // Try to answer using saved FDA data
-  const systemPrompt = `You are a helpful medical information assistant. The user is asking a follow-up question about a previous medication query.
-
-Original Query: "${originalQuery.user_query}"
-Medication: ${originalQuery.medication_name || 'Not specified'}
-Previous Response: "${originalQuery.ai_response}"
-
-${conversationHistory ? `Previous Conversation:\n${conversationHistory}` : ''}
-
-Available FDA Data Sections:
-${Object.entries(fdaData).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}
-
-Please answer the user's follow-up question using ONLY the FDA data provided above. If you cannot answer the question with the available FDA data, respond with "INSUFFICIENT_DATA".
-
-IMPORTANT: Format your response with a "Bottom line:" summary at the end. Always include appropriate medical disclaimers.
-
-Example format:
-[Detailed explanation here]
-
-Bottom line: [One sentence summary of the key point]`
-
+async function tryAnswerFromSavedData(
+  query: string,
+  originalQuery: any,
+  previousMessages: any[]
+): Promise<{ canAnswer: boolean; content: string; citations: any[] }> {
   try {
+    console.log('🤖 Attempting to answer from saved FDA data')
+    
+    // Build conversation context
+    let conversationContext = `Original Question: ${originalQuery.user_query}\n`
+    conversationContext += `Original Answer: ${originalQuery.ai_response}\n\n`
+
+    if (previousMessages && previousMessages.length > 0) {
+      conversationContext += 'Previous Follow-up Conversation:\n'
+      previousMessages.forEach((msg, index) => {
+        if (msg.message_type === 'question') {
+          conversationContext += `Follow-up Question ${Math.floor(index / 2) + 1}: ${msg.content}\n`
+        } else if (msg.message_type === 'answer') {
+          conversationContext += `Follow-up Answer ${Math.floor(index / 2) + 1}: ${msg.content}\n`
+        }
+      })
+      conversationContext += '\n'
+    }
+
+    // Get FDA sections that were used in the original query
+    const fdaSections = originalQuery.fda_sections_used || []
+    
+    // Format the FDA data for context
+    let fdaContext = ''
+    if (originalQuery.fda_raw_data && fdaSections.length > 0) {
+      fdaContext = 'Available FDA Information:\n'
+      fdaSections.forEach((section: string) => {
+        if (originalQuery.fda_raw_data[section]) {
+          fdaContext += `\n${section.toUpperCase().replace(/_/g, ' ')}:\n`
+          const sectionData = originalQuery.fda_raw_data[section]
+          if (Array.isArray(sectionData)) {
+            sectionData.forEach((item: any) => {
+              if (typeof item === 'string') {
+                fdaContext += `- ${item}\n`
+              } else if (typeof item === 'object' && item !== null) {
+                Object.entries(item).forEach(([key, value]) => {
+                  fdaContext += `- ${key}: ${value}\n`
+                })
+              }
+            })
+          } else if (typeof sectionData === 'string') {
+            fdaContext += `- ${sectionData}\n`
+          }
+        }
+      })
+    }
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: query }
+        {
+          role: 'system',
+          content: `You are a medication information assistant. You have access to saved FDA data and need to determine if you can answer a follow-up question using only that data.
+
+IMPORTANT: You must respond with a JSON object in this exact format:
+{
+  "canAnswer": true/false,
+  "response": "your answer here or empty string if cannot answer"
+}
+
+Rules:
+1. Set canAnswer to true ONLY if you can provide a complete, accurate answer using the available FDA data
+2. Set canAnswer to false if:
+   - The question asks about a different medication than what's in the FDA data
+   - The required information is not present in the FDA data
+   - You need additional information to answer properly
+3. If canAnswer is true, provide a helpful response starting with "**Bottom Line:**"
+4. If canAnswer is false, leave response as an empty string
+5. Be conservative - only answer if you're confident the FDA data contains the needed information`
+        },
+        {
+          role: 'user',
+          content: `${conversationContext}
+
+Current Follow-up Question: ${query}
+
+${fdaContext || 'No FDA data available.'}
+
+Can you answer this follow-up question using only the available FDA data? Respond in JSON format.`
+        }
       ],
-      temperature: 0.7,
-      max_tokens: 800,
+      temperature: 0.1,
+      max_tokens: 1000,
     })
 
-    const response = completion.choices[0]?.message?.content || ''
+    const responseText = completion.choices[0]?.message?.content?.trim()
+    console.log('🤖 AI Response from saved data:', responseText)
     
-    if (response.includes('INSUFFICIENT_DATA')) {
+    if (!responseText) {
       return { canAnswer: false, content: '', citations: [] }
     }
 
-    // Create citations from the FDA sections used
-    const citations = fdaSections.map((section: string, index: number) => ({
-      id: index + 1,
-      title: `FDA ${section.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`,
-      url: `https://www.fda.gov/drugs/drug-approvals-and-databases/approved-drug-products-therapeutic-equivalence-evaluations-orange-book`,
-      snippet: `Information from FDA ${section} section for ${originalQuery.medication_name}`
-    }))
-
-    return { canAnswer: true, content: response, citations }
+    try {
+      const parsed = JSON.parse(responseText)
+      
+      if (parsed.canAnswer === true && parsed.response) {
+        console.log('✅ AI can answer from saved data')
+        
+        // Create citations from the FDA sections used
+        const citations = fdaSections.map((section: string, index: number) => ({
+          id: index + 1,
+          title: `FDA ${section.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}`,
+          url: `https://www.fda.gov/drugs/drug-approvals-and-databases/approved-drug-products-therapeutic-equivalence-evaluations-orange-book`,
+          snippet: `Information from FDA ${section} section for ${originalQuery.medication_name}`
+        }))
+        
+        return { canAnswer: true, content: parsed.response, citations }
+      } else {
+        console.log('❌ AI cannot answer from saved data')
+        return { canAnswer: false, content: '', citations: [] }
+      }
+    } catch (parseError) {
+      console.error('❌ Error parsing AI response:', parseError)
+      return { canAnswer: false, content: '', citations: [] }
+    }
   } catch (error) {
     console.error('Error answering from saved data:', error)
     return { canAnswer: false, content: '', citations: [] }
@@ -200,6 +260,7 @@ export async function POST(request: NextRequest) {
     let responseContent = ''
     let citations: any[] = []
     let websearchUsed = false
+    let savedDataResponse: any = null
 
     // Step 3: Handle the query based on intent
     if (isWebSearchIntent) {
@@ -241,7 +302,12 @@ export async function POST(request: NextRequest) {
       console.log('🏥 Processing FDA-related request')
       
       // First try to answer from saved FDA data
-      const savedDataResponse = await tryAnswerFromSavedData(query, originalQuery, previousMessages || [])
+      savedDataResponse = await tryAnswerFromSavedData(query, originalQuery, previousMessages || [])
+      
+      console.log('🔍 savedDataResponse.canAnswer:', savedDataResponse.canAnswer)
+      console.log('🔍 savedDataResponse.content preview:', savedDataResponse.content.substring(0, 100))
+      console.log('🔍 savedDataResponse full content:', savedDataResponse.content)
+      console.log('🔍 savedDataResponse citations:', savedDataResponse.citations)
       
       if (savedDataResponse.canAnswer) {
         console.log('✅ Answered from saved FDA data')
@@ -249,34 +315,87 @@ export async function POST(request: NextRequest) {
         citations = savedDataResponse.citations || []
         websearchUsed = false
       } else {
-        console.log('❌ Cannot answer from saved data, performing new FDA search')
-        // Need new FDA search - use the existing FDA search endpoint
+        console.log('❌ Cannot answer from saved data, performing full FDA search workflow')
+        
         try {
-          const fdaSearchResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/follow-up-fda`, {
+          // Step 1: Extract medication and intent from the follow-up query
+          console.log('🔍 Step 1: Extracting medication and intent from query')
+          const extractResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/extract-medication`, {
             method: 'POST',
             headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
+              'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              followUpQuestion: query,
-              queryId: originalQuery.id,
-              mode: 'fda_docs'
-            })
+            body: JSON.stringify({ query })
           })
 
-          if (fdaSearchResponse.ok) {
-            const result = await fdaSearchResponse.json()
-            responseContent = result.response || 'No FDA search results found.'
-            citations = result.citations || []
-            websearchUsed = false
-          } else {
-            responseContent = 'I apologize, but I was unable to perform an FDA search at this time. Please try again later.'
+          if (!extractResponse.ok) {
+            throw new Error('Failed to extract medication and intent')
+          }
+
+          const extractResult = await extractResponse.json()
+          console.log('🔍 Extraction result:', extractResult)
+          
+          const medication = extractResult.medication || originalQuery.medication_name
+          const fdaSections = extractResult.fdaSections || []
+          
+          if (!medication) {
+            console.log('❌ No medication found in query, using original medication')
+            responseContent = 'I need more specific information about which medication you\'re asking about. Could you please clarify?'
             citations = []
             websearchUsed = false
+          } else {
+            // Step 2: Perform full FDA search using generate-response workflow
+            console.log(`🏥 Step 2: Performing FDA search for medication: ${medication}`)
+            const generateResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/generate-response`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+              },
+              body: JSON.stringify({
+                query: query,
+                medication: medication,
+                fdaSections: fdaSections,
+                isFollowUp: true,
+                originalQueryId: originalQuery.id
+              })
+            })
+
+            if (generateResponse.ok) {
+              const result = await generateResponse.json()
+              console.log('✅ Full FDA search successful')
+              responseContent = result.response || 'No FDA search results found.'
+              
+              // Generate FDA citations based on the sections searched
+              citations = fdaSections?.map((section, index) => ({
+                title: `FDA ${section.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`,
+                url: `https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${encodeURIComponent(medication || '')}`,
+                snippet: `Official FDA information from ${section.replace(/_/g, ' ')} section for ${medication}`,
+                display_url: 'dailymed.nlm.nih.gov'
+              })) || []
+              
+              // Add general FDA source if no specific sections
+              if (citations.length === 0 && medication) {
+                citations = [{
+                  title: `FDA Drug Information for ${medication}`,
+                  url: `https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${encodeURIComponent(medication)}`,
+                  snippet: `Official FDA drug labeling information for ${medication}`,
+                  display_url: 'dailymed.nlm.nih.gov'
+                }]
+              }
+              
+              websearchUsed = false
+              console.log('📝 Generated citations:', citations.length)
+              console.log('📝 Final responseContent after full FDA search:', responseContent.substring(0, 200))
+            } else {
+              console.log('❌ Generate response failed')
+              responseContent = 'I apologize, but I was unable to perform an FDA search at this time. Please try again later.'
+              citations = []
+              websearchUsed = false
+            }
           }
         } catch (error) {
-          console.error('❌ FDA search error:', error)
+          console.error('❌ Full FDA search workflow error:', error)
           responseContent = 'I apologize, but I encountered an error while searching the FDA database. Please try again later.'
           citations = []
           websearchUsed = false
@@ -284,13 +403,108 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Return success response (messages are saved by the respective APIs)
+    // Save the question and answer to database
+    console.log('💾 Saving smart follow-up messages to database...')
+    
+    // Use the user we already have from earlier in the function
+    if (!user) {
+      console.error('❌ No user found for saving messages')
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
+    }
+    
+    // Check for recent duplicate questions to prevent double-submission
+    // But allow duplicates if we performed a new FDA search with different results
+    const performedNewSearch = !savedDataResponse?.canAnswer && !isWebSearchIntent
+    
+    if (!performedNewSearch) {
+      const { data: recentMessages } = await supabase
+        .from('fda_messages')
+        .select('content, created_at')
+        .eq('query_id', queryId)
+        .eq('user_id', user.id)
+        .eq('message_type', 'question')
+        .order('created_at', { ascending: false })
+        .limit(3)
+      
+      // Check if this exact question was asked in the last 30 seconds
+      const isDuplicate = recentMessages?.some(msg => 
+        msg.content.trim() === query.trim() && 
+        new Date().getTime() - new Date(msg.created_at).getTime() < 30000
+      )
+      
+      if (isDuplicate) {
+        console.log('⚠️ Duplicate question detected, skipping save')
+        return NextResponse.json({ 
+          response: 'Question already processed recently',
+          intent: isWebSearchIntent ? 'web_search' : 'fda_search'
+        })
+      }
+    } else {
+      console.log('🔄 Allowing save because we performed a new FDA search')
+    }
+
+    try {
+      // Map intent to valid follow_up_mode values
+      const followUpMode = isWebSearchIntent ? 'websearch' : 'fda_docs'
+      
+      // Save the question
+      console.log('💾 Saving question to database...')
+      const { data: questionData, error: questionError } = await supabase
+        .from('fda_messages')
+        .insert({
+          query_id: queryId,
+          user_id: user.id,
+          message_type: 'question',
+          content: query,
+          follow_up_mode: followUpMode,
+          websearch_enabled: websearchUsed
+        })
+        .select()
+        .single()
+
+      if (questionError) {
+        console.error('❌ Error saving question:', questionError)
+      } else {
+        console.log('✅ Question saved successfully:', questionData?.id)
+      }
+
+      // Save the answer
+      console.log('💾 Saving answer to database...')
+      console.log('📝 Citations being saved:', JSON.stringify(citations, null, 2))
+      console.log('📝 Citations count:', citations?.length || 0)
+      
+      const { data: answerData, error: answerError } = await supabase
+        .from('fda_messages')
+        .insert({
+          query_id: queryId,
+          user_id: user.id,
+          message_type: 'answer',
+          content: responseContent,
+          citations: citations || null,
+          follow_up_mode: followUpMode,
+          websearch_enabled: websearchUsed
+        })
+        .select()
+        .single()
+
+      if (answerError) {
+        console.error('❌ Error saving answer:', answerError)
+      } else {
+        console.log('✅ Answer saved successfully:', answerData?.id)
+      }
+
+    } catch (dbError) {
+      console.error('❌ Database save error:', dbError)
+      // Don't fail the request if database save fails
+    }
+
+    // Return success response
     return NextResponse.json({
-      success: true,
-      intent: isWebSearchIntent ? 'web_search' : 'fda_search',
       response: responseContent,
-      citations,
-      websearchUsed
+      intent: isWebSearchIntent ? 'web_search' : 'fda_search',
+      citations: citations,
+      websearchUsed: websearchUsed,
+      performedNewSearch: !savedDataResponse?.canAnswer && !isWebSearchIntent
     })
 
   } catch (error) {

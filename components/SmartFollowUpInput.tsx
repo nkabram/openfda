@@ -134,7 +134,7 @@ const IntentConfirmation = ({ intent, message, onConfirm, onCancel, onAlternativ
   )
 }
 
-export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: SmartFollowUpInputProps) {
+function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: SmartFollowUpInputProps) {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState<{
@@ -153,17 +153,16 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
   const { session } = useAuth()
 
   const updateStepStatus = (stepId: string, status: ProgressStep['status']) => {
-    setProgressSteps(prev => 
-      prev.map(step => 
-        step.id === stepId ? { ...step, status } : step
-      )
-    )
+    setProgressSteps(prev => prev.map(step => 
+      step.id === stepId ? { ...step, status } : step
+    ))
   }
 
   const resetProgress = () => {
     setProgressSteps([
       { id: 'detect', label: 'Detecting intent', status: 'pending' },
       { id: 'process', label: 'Processing question', status: 'pending' },
+      { id: 'fda_search', label: 'Doing new FDA search', status: 'pending' },
       { id: 'respond', label: 'Generating response', status: 'pending' },
     ])
   }
@@ -171,7 +170,7 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!question.trim() || isLoading || disabled) return
-
+    
     await processFollowUp(question.trim())
   }
 
@@ -192,6 +191,9 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
       // Step 1: Detect intent
       updateStepStatus('detect', 'active')
       
+      // Add a small delay to make the progress visible
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       }
@@ -200,6 +202,12 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`
       }
+      
+      updateStepStatus('detect', 'completed')
+      updateStepStatus('process', 'active')
+      
+      // Add another small delay
+      await new Promise(resolve => setTimeout(resolve, 300))
       
       const response = await fetch('/api/smart-followup', {
         method: 'POST',
@@ -210,9 +218,6 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
           forceIntent
         }),
       })
-      
-      updateStepStatus('detect', 'completed')
-      updateStepStatus('process', 'active')
 
       if (!response.ok) {
         throw new Error('Failed to process follow-up')
@@ -220,6 +225,9 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
 
       updateStepStatus('process', 'completed')
       updateStepStatus('respond', 'active')
+      
+      // Add final delay before completing
+      await new Promise(resolve => setTimeout(resolve, 300))
       
       const result = await response.json()
 
@@ -333,46 +341,48 @@ export default function SmartFollowUpInput({ queryId, onMessageAdded, disabled =
             />
           )}
 
-      {/* Progress Indicator */}
-      {isLoading && (
-        <div className="space-y-2">
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-in-out"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            {activeStep && !errorStep && (
-              <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-            )}
-            {errorStep ? (
-              <span className="text-red-500">Error: {errorStep.label}</span>
-            ) : activeStep ? (
-              <span>{activeStep.label}</span>
-            ) : completedSteps.length === progressSteps.length ? (
-              <span>✅ Complete!</span>
-            ) : (
-              <span>Processing...</span>
-            )}
-          </div>
-        </div>
-      )}
+          {/* Progress Indicator */}
+          {isLoading && (
+            <div className="space-y-2">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-in-out"
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                {activeStep && !errorStep && (
+                  <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                )}
+                {errorStep ? (
+                  <span className="text-red-500">Error: {errorStep.label}</span>
+                ) : activeStep ? (
+                  <span>{activeStep.label}</span>
+                ) : completedSteps.length === progressSteps.length ? (
+                  <span>✅ Complete!</span>
+                ) : (
+                  <span>Processing...</span>
+                )}
+              </div>
+            </div>
+          )}
 
-      {/* Smart Follow-up Input */}
-      <form onSubmit={handleSubmit}>
-        <Textarea
-          ref={textareaRef}
-          placeholder="Ask a follow-up question (press Enter to submit)"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="min-h-[60px] resize-none bg-background text-foreground placeholder:text-muted-foreground border-input"
-          disabled={isLoading || disabled}
-        />
-      </form>
+          {/* Smart Follow-up Input */}
+          <form onSubmit={handleSubmit}>
+            <Textarea
+              ref={textareaRef}
+              placeholder="Ask a follow-up question (press Enter to submit)"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="min-h-[60px] resize-none bg-background text-foreground placeholder:text-muted-foreground border-input"
+              disabled={isLoading || disabled}
+            />
+          </form>
         </div>
       </CardContent>
     </Card>
   )
 }
+
+export default SmartFollowUpInput

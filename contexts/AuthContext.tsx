@@ -177,6 +177,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         console.error('❌ Status API error:', response.status, response.statusText)
+        
+        // Try to get error details
+        try {
+          const errorData = await response.json()
+          console.log('📜 Error response data:', errorData)
+          
+          // If the server says we need to re-authenticate, sign out automatically
+          if (errorData.shouldSignOut || errorData.needsReauth) {
+            console.log('🔑 Server indicates re-authentication needed, signing out...')
+            clearAuthCache()
+            setAuthCacheLoaded(false)
+            setLastStatusCheck(0)
+            
+            // Force sign out and redirect
+            await signOut()
+            return
+          }
+        } catch (parseError) {
+          console.log('⚠️ Could not parse error response')
+        }
+        
         setIsApproved(false)
         setIsAdmin(false)
         // Don't cache failed responses
@@ -365,32 +386,91 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    // Clear auth cache before signing out
-    clearAuthCache()
-    setAuthCacheLoaded(false)
-    setLastStatusCheck(0)
+    console.log('🚪 Starting sign out process...')
     
-    // Sign out from Supabase
-    await supabase.auth.signOut()
-    
-    // Clear any cached Google auth state by redirecting to Google's logout
-    // This ensures the next sign-in will prompt for account selection
-    if (typeof window !== 'undefined') {
-      // Optional: Clear local storage items that might cache auth state
-      localStorage.removeItem('supabase.auth.token')
+    try {
+      // Clear auth cache before signing out
+      clearAuthCache()
+      setAuthCacheLoaded(false)
+      setLastStatusCheck(0)
       
-      // Force a brief redirect to Google's logout to clear their session
-      // This is done in a hidden iframe to avoid disrupting the user experience
-      const iframe = document.createElement('iframe')
-      iframe.style.display = 'none'
-      iframe.src = 'https://accounts.google.com/logout'
-      document.body.appendChild(iframe)
+      // Clear local state immediately
+      setUser(null)
+      setSession(null)
+      setIsApproved(false)
+      setIsAdmin(false)
+      setApprovalLoading(false)
+      setLoading(false)
       
-      // Remove the iframe after a short delay
-      setTimeout(() => {
-        document.body.removeChild(iframe)
-      }, 1000)
+      // Clear any cached auth state from localStorage first
+      if (typeof window !== 'undefined') {
+        console.log('🧽 Clearing localStorage auth data...')
+        
+        // Clear all possible Supabase auth keys
+        const keysToRemove = [
+          'supabase.auth.token',
+          'sb-blftrjkwaxjggsmjyxeq-auth-token',
+          'medguard_auth_cache',
+          'medguard_query_cache'
+        ]
+        
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key)
+        })
+        
+        // Clear all localStorage keys that start with 'sb-' (Supabase keys)
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-')) {
+            localStorage.removeItem(key)
+          }
+        })
+      }
+      
+      // Try to sign out from Supabase
+      console.log('🔑 Attempting Supabase sign out...')
+      await supabase.auth.signOut({ scope: 'global' })
+      console.log('✅ Supabase sign out successful')
+      
+      // Force clear session storage as well
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear()
+        
+        // Force a brief redirect to Google's logout to clear their session
+        // This is done in a hidden iframe to avoid disrupting the user experience
+        const iframe = document.createElement('iframe')
+        iframe.style.display = 'none'
+        iframe.src = 'https://accounts.google.com/logout'
+        document.body.appendChild(iframe)
+        
+        // Remove the iframe after a short delay
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe)
+          }
+        }, 1000)
+        
+        // Force a hard refresh after logout to ensure clean state
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 1500)
+      }
+      
+    } catch (error) {
+      console.log('⚠️ Supabase sign out failed, forcing local cleanup:', error)
+      
+      // Even if Supabase signout fails, ensure local state is cleared
+      if (typeof window !== 'undefined') {
+        localStorage.clear()
+        sessionStorage.clear()
+        
+        // Force redirect to clean state
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 500)
+      }
     }
+    
+    console.log('✅ Sign out process completed')
   }
 
   const value = {

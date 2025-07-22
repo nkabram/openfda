@@ -136,32 +136,62 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   // Helper function to load follow-up messages
   const loadFollowUpMessages = async (queryId: string) => {
     try {
-      const headers: Record<string, string> = {}
+      console.log('💬 Loading follow-up messages for query:', queryId)
+      console.log('💬 Session state:', { hasSession: !!session, hasAccessToken: !!session?.access_token })
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
       
       // Always add authorization header if session exists
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`
+        console.log('💬 Added auth header, token length:', session.access_token.length)
+      } else {
+        console.log('⚠️ No session or access token available for messages API')
+        // If no session, skip loading messages
+        console.log('⚠️ Skipping message load due to missing authentication')
+        return
       }
 
+      console.log('💬 Making API call to /api/messages with headers:', headers)
       const response = await fetch(`/api/messages?queryId=${queryId}`, { headers })
+      
+      console.log('💬 API response status:', response.status, response.statusText)
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch messages')
+        const errorText = await response.text()
+        console.log('❌ Messages API error response:', errorText)
+        throw new Error(`Failed to fetch messages: ${response.status} ${errorText}`)
       }
 
       const data = await response.json()
       const messages = data.messages || []
+      console.log('💬 Raw messages from API:', messages)
+      console.log('💬 API response data:', data)
 
       // Convert database messages to follow-up messages format
-      const followUpMessages = messages.map((msg: any) => ({
-        id: msg.id,
-        type: msg.message_type,
-        content: msg.content,
-        timestamp: new Date(msg.created_at),
-        citations: msg.citations || [],
-        websearchUsed: msg.websearch_enabled || false
-      }))
+      const followUpMessages = messages.map((msg: any) => {
+        console.log('📝 Message citations from DB:', msg.citations)
+        console.log('📝 Message citations type:', typeof msg.citations)
+        console.log('📝 Message citations length:', msg.citations?.length || 0)
+        
+        return {
+          id: msg.id,
+          type: msg.message_type,
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          citations: msg.citations || [],
+          websearchUsed: msg.websearch_enabled || false
+        }
+      })
 
+      console.log('💬 Converted follow-up messages:', followUpMessages)
+      console.log('💬 Setting followUpMessages state with', followUpMessages.length, 'messages')
       setFollowUpMessages(followUpMessages)
+      
+      // Log completion
+      console.log('💬 loadFollowUpMessages completed successfully')
     } catch (error) {
       console.error('Error loading follow-up messages:', error)
     }
@@ -256,13 +286,22 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
 
   // Handler for smart follow-up input component
   const handleSmartFollowUpAdded = async (newMessages: FollowUpMessage[]) => {
+    console.log('🚀 handleSmartFollowUpAdded called with:', newMessages)
+    console.log('🚀 currentQueryId:', currentQueryId)
+    console.log('🚀 Current followUpMessages state before reload:', followUpMessages)
+    
     // Since the API saves messages to database, reload from database instead of adding locally
     // This prevents duplication when messages are loaded from database
     if (currentQueryId) {
+      console.log('🚀 Calling loadFollowUpMessages for queryId:', currentQueryId)
       await loadFollowUpMessages(currentQueryId)
+      
+      console.log('🚀 loadFollowUpMessages call completed')
+    } else {
+      console.log('⚠️ No currentQueryId found, cannot reload messages')
     }
     
-    // Clear any existing "needs more info" prompt since we have a new response
+    // Clear any existing prompts
     setNeedsMoreInfoPrompt(null)
   }
 

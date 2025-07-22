@@ -17,23 +17,43 @@ const supabase = createClient(supabaseUrl!, supabaseKey!)
 async function getUserFromRequest(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader) return null
+    console.log('🔑 Messages API - Auth header received:', authHeader ? 'Bearer [REDACTED]' : 'None')
+    if (!authHeader) {
+      console.log('❌ Messages API - No auth header provided')
+      return null
+    }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user } } = await supabase.auth.getUser(token)
+    console.log('🎫 Messages API - Token length:', token.length, 'First 10 chars:', token.substring(0, 10))
+    const { data: { user }, error } = await supabase.auth.getUser(token)
+    
+    if (error) {
+      console.log('❌ Messages API - Auth error:', error.message)
+      return null
+    }
+    
+    if (user) {
+      console.log('✅ Messages API - User authenticated:', user.email)
+    } else {
+      console.log('❌ Messages API - No user found for token')
+    }
+    
     return user
   } catch (error) {
-    console.error('Error getting user:', error)
+    console.error('❌ Messages API - Error getting user:', error)
     return null
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('💬 Messages API called')
     const { searchParams } = new URL(request.url)
     const queryId = searchParams.get('queryId')
+    console.log('💬 Requested queryId:', queryId)
 
     if (!queryId) {
+      console.log('❌ Messages API - No queryId provided')
       return NextResponse.json(
         { error: 'Query ID is required' },
         { status: 400 }
@@ -43,14 +63,17 @@ export async function GET(request: NextRequest) {
     let userId = null
 
     // Always get user from request for proper authentication
+    console.log('🔍 Messages API - Getting user from request...')
     const user = await getUserFromRequest(request)
     if (!user) {
+      console.log('❌ Messages API - User authentication failed')
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
     userId = user.id
+    console.log('✅ Messages API - User authenticated, userId:', userId)
 
     // Verify user has access to this query
     const { data: query, error: queryError } = await supabase
