@@ -90,11 +90,27 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    console.log('💾 [PRODUCTION DEBUG] Fetching messages from database for queryId:', queryId)
     const { data, error } = await supabase
       .from('fda_messages')
       .select('*')
       .eq('query_id', queryId)
       .order('created_at', { ascending: true })
+
+    console.log('💾 [PRODUCTION DEBUG] Database query result:', { 
+      error: !!error, 
+      dataCount: data?.length || 0,
+      errorMessage: error?.message 
+    })
+    
+    if (data && data.length > 0) {
+      console.log('💾 [PRODUCTION DEBUG] First message sample:', {
+        id: data[0].id,
+        type: data[0].message_type,
+        contentPreview: data[0].content?.substring(0, 50) + '...',
+        createdAt: data[0].created_at
+      })
+    }
 
     if (error) {
       console.error('Error fetching messages:', error)
@@ -104,6 +120,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    console.log('💾 [PRODUCTION DEBUG] Returning messages:', data?.length || 0, 'messages')
     return NextResponse.json({ messages: data || [] })
   } catch (error) {
     console.error('Error in messages GET:', error)

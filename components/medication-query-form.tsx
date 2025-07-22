@@ -85,6 +85,12 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   // Hooks
   const { toast } = useToast()
   const { session } = useAuth()
+  
+  // Debug: Track followUpMessages changes
+  useEffect(() => {
+    console.log('🔄 [PRODUCTION DEBUG] followUpMessages state changed:', followUpMessages.length, 'messages')
+    console.log('🔄 [PRODUCTION DEBUG] followUpMessages content:', followUpMessages)
+  }, [followUpMessages])
 
   // Effect to handle selected query
   useEffect(() => {
@@ -286,19 +292,32 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
 
   // Handler for smart follow-up input component
   const handleSmartFollowUpAdded = async (newMessages: FollowUpMessage[]) => {
-    console.log('🚀 handleSmartFollowUpAdded called with:', newMessages)
-    console.log('🚀 response.queryId:', response?.queryId)
-    console.log('🚀 Current followUpMessages state before reload:', followUpMessages)
+    console.log('🚀 [PRODUCTION DEBUG] handleSmartFollowUpAdded called with:', newMessages)
+    console.log('🚀 [PRODUCTION DEBUG] response object:', response)
+    console.log('🚀 [PRODUCTION DEBUG] response.queryId:', response?.queryId)
+    console.log('🚀 [PRODUCTION DEBUG] Current followUpMessages state before reload:', followUpMessages.length, 'messages')
+    console.log('🚀 [PRODUCTION DEBUG] Session state:', { hasSession: !!session, hasAccessToken: !!session?.access_token })
     
     // Since the API saves messages to database, reload from database instead of adding locally
     // This prevents duplication when messages are loaded from database
     if (response?.queryId) {
-      console.log('🚀 Calling loadFollowUpMessages for queryId:', response.queryId)
-      await loadFollowUpMessages(response.queryId)
+      console.log('🚀 [PRODUCTION DEBUG] Calling loadFollowUpMessages for queryId:', response.queryId)
+      console.log('🚀 [PRODUCTION DEBUG] About to call loadFollowUpMessages...')
       
-      console.log('🚀 loadFollowUpMessages call completed')
+      try {
+        // Add a small delay to ensure the smart follow-up API has finished saving to database
+        console.log('🚀 [PRODUCTION DEBUG] Waiting 1 second before loading messages...')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        await loadFollowUpMessages(response.queryId)
+        console.log('🚀 [PRODUCTION DEBUG] loadFollowUpMessages call completed successfully')
+        console.log('🚀 [PRODUCTION DEBUG] followUpMessages state after reload:', followUpMessages.length, 'messages')
+      } catch (error) {
+        console.error('❌ [PRODUCTION DEBUG] Error in loadFollowUpMessages:', error)
+      }
     } else {
-      console.log('⚠️ No response.queryId found, cannot reload messages')
+      console.log('⚠️ [PRODUCTION DEBUG] No response.queryId found, cannot reload messages')
+      console.log('⚠️ [PRODUCTION DEBUG] response object keys:', response ? Object.keys(response) : 'response is null/undefined')
     }
     
     // Clear any existing prompts
