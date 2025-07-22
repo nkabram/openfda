@@ -287,18 +287,18 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   // Handler for smart follow-up input component
   const handleSmartFollowUpAdded = async (newMessages: FollowUpMessage[]) => {
     console.log('🚀 handleSmartFollowUpAdded called with:', newMessages)
-    console.log('🚀 currentQueryId:', currentQueryId)
+    console.log('🚀 response.queryId:', response?.queryId)
     console.log('🚀 Current followUpMessages state before reload:', followUpMessages)
     
     // Since the API saves messages to database, reload from database instead of adding locally
     // This prevents duplication when messages are loaded from database
-    if (currentQueryId) {
-      console.log('🚀 Calling loadFollowUpMessages for queryId:', currentQueryId)
-      await loadFollowUpMessages(currentQueryId)
+    if (response?.queryId) {
+      console.log('🚀 Calling loadFollowUpMessages for queryId:', response.queryId)
+      await loadFollowUpMessages(response.queryId)
       
       console.log('🚀 loadFollowUpMessages call completed')
     } else {
-      console.log('⚠️ No currentQueryId found, cannot reload messages')
+      console.log('⚠️ No response.queryId found, cannot reload messages')
     }
     
     // Clear any existing prompts

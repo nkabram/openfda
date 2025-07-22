@@ -168,9 +168,17 @@ Can you answer this follow-up question using only the available FDA data? Respon
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 Smart follow-up API called')
+  console.log('🌐 Request URL:', request.url)
+  console.log('🔗 Request headers:', Object.fromEntries(request.headers.entries()))
+  
   try {
-    console.log('🚀 Smart follow-up API called')
-    
+    const body = await request.json()
+    const { query, queryId, forceIntent } = body
+    console.log('📝 Request body:', { query, queryId, forceIntent })
+    console.log('📝 Body keys:', Object.keys(body))
+    console.log('📝 Body size:', JSON.stringify(body).length)
+
     // Get the auth token for passing to other endpoints
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
@@ -184,10 +192,6 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const body: SmartFollowUpRequest = await request.json()
-    console.log('📝 Request body:', body)
-    const { query, queryId, forceIntent } = body
 
     if (!query?.trim() || !queryId) {
       console.log('❌ Missing query or queryId')
@@ -487,6 +491,17 @@ export async function POST(request: NextRequest) {
     try {
       // Map intent to valid follow_up_mode values
       const followUpMode = isWebSearchIntent ? 'websearch' : 'fda_docs'
+      
+      console.log('💾 Starting database save process...')
+      console.log('💾 Save parameters:', {
+        queryId,
+        userId: user.id,
+        followUpMode,
+        websearchUsed,
+        queryLength: query.length,
+        responseLength: responseContent.length,
+        citationsCount: citations?.length || 0
+      })
       
       // Save the question
       console.log('💾 Saving question to database...')
