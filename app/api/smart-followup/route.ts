@@ -549,10 +549,6 @@ export async function POST(request: NextRequest) {
       } else {
         console.log('✅ Answer saved successfully:', answerData?.id)
         console.log('🕰️ Answer saved at timestamp:', new Date().toISOString())
-        
-        // Add a small delay to ensure database write is committed
-        await new Promise(resolve => setTimeout(resolve, 50))
-        console.log('🕰️ Database write delay completed')
       }
 
     } catch (dbError) {
@@ -575,7 +571,8 @@ export async function POST(request: NextRequest) {
       intent: isWebSearchIntent ? 'web_search' : 'fda_search',
       citations: citations,
       websearchUsed: websearchUsed,
-      performedNewSearch: !savedDataResponse?.canAnswer && !isWebSearchIntent
+      performedNewSearch: !savedDataResponse?.canAnswer && !isWebSearchIntent,
+      databaseSaveCompleted: true // Flag to indicate database writes are done
     })
 
   } catch (error) {

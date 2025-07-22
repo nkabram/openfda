@@ -291,33 +291,14 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   }
 
   // Handler for smart follow-up input component
-  const handleSmartFollowUpAdded = async (newMessages: FollowUpMessage[]) => {
-    console.log('🚀 [PRODUCTION DEBUG] handleSmartFollowUpAdded called with:', newMessages)
-    console.log('🚀 [PRODUCTION DEBUG] response object:', response)
-    console.log('🚀 [PRODUCTION DEBUG] response.queryId:', response?.queryId)
-    console.log('🚀 [PRODUCTION DEBUG] Current followUpMessages state before reload:', followUpMessages.length, 'messages')
-    console.log('🚀 [PRODUCTION DEBUG] Session state:', { hasSession: !!session, hasAccessToken: !!session?.access_token })
+  const handleSmartFollowUpAdded = (newMessages: FollowUpMessage[]) => {
+    console.log('🚀 [PRODUCTION DEBUG] handleSmartFollowUpAdded called with:', newMessages.length, 'new messages')
     
-    // Since the API saves messages to database, reload from database instead of adding locally
-    // This prevents duplication when messages are loaded from database
-    if (response?.queryId) {
-      console.log('🚀 [PRODUCTION DEBUG] Calling loadFollowUpMessages for queryId:', response.queryId)
-      console.log('🚀 [PRODUCTION DEBUG] About to call loadFollowUpMessages...')
-      
-      try {
-        // Add a delay to ensure the smart follow-up API has finished saving to database
-        console.log('🚀 [PRODUCTION DEBUG] Waiting 2 seconds before loading messages...')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
-        await loadFollowUpMessages(response.queryId)
-        console.log('🚀 [PRODUCTION DEBUG] loadFollowUpMessages call completed successfully')
-        console.log('🚀 [PRODUCTION DEBUG] followUpMessages state after reload:', followUpMessages.length, 'messages')
-      } catch (error) {
-        console.error('❌ [PRODUCTION DEBUG] Error in loadFollowUpMessages:', error)
-      }
-    } else {
-      console.log('⚠️ [PRODUCTION DEBUG] No response.queryId found, cannot reload messages')
-      console.log('⚠️ [PRODUCTION DEBUG] response object keys:', response ? Object.keys(response) : 'response is null/undefined')
+    // Simply add the new messages to the existing state
+    // The smart follow-up component already handles database saving in the background
+    if (newMessages.length > 0) {
+      setFollowUpMessages(prevMessages => [...prevMessages, ...newMessages])
+      console.log('🚀 [PRODUCTION DEBUG] Added messages to state. Total messages:', followUpMessages.length + newMessages.length)
     }
     
     // Clear any existing prompts

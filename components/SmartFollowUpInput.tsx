@@ -250,11 +250,29 @@ function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: Smart
         return
       }
 
-      // Success - messages are saved to database by API
+      // Success - create the messages immediately for UI display
       updateStepStatus('respond', 'completed')
       
-      // Trigger reload of messages from database instead of creating local ones
-      onMessageAdded([])
+      // Create the new messages from the API response
+      const newMessages: FollowUpMessage[] = [
+        {
+          id: `question-${Date.now()}`,
+          type: 'question',
+          content: queryText,
+          timestamp: new Date()
+        },
+        {
+          id: `answer-${Date.now() + 1}`,
+          type: 'answer', 
+          content: result.response,
+          timestamp: new Date(),
+          citations: result.citations || [],
+          websearchUsed: result.websearchUsed || false
+        }
+      ]
+      
+      // Add messages to UI immediately (database save happens in background via API)
+      onMessageAdded(newMessages)
 
       // Clear the input
       setQuestion('')
