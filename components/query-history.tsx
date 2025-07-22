@@ -85,19 +85,19 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId,
 
   const handleDeleteQuery = useCallback(async (queryId: string) => {
     try {
+      // Immediately reset form to new query screen
+      if (onQuerySelected) {
+        onQuerySelected(null as any)
+      }
+      
+      // Delete query (optimistic update removes from UI immediately)
       await deleteQuery(queryId)
+      
       toast({
         title: "Query deleted",
         description: "The query has been removed from your history.",
       })
       
-      // Clear the selected query to reset to new query screen
-      if (onQuerySelected) {
-        onQuerySelected(null as any)
-      }
-      
-      // Refresh the query list
-      await refetch()
     } catch (error) {
       console.error('Error deleting query:', error)
       toast({
@@ -105,8 +105,9 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId,
         description: "Please try again.",
         variant: "destructive",
       })
+      // Note: If delete fails, useQueries hook will restore the query via refetch
     }
-  }, [deleteQuery, refetch, toast, onQuerySelected])
+  }, [deleteQuery, toast, onQuerySelected])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -197,9 +198,9 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId,
                         <MoreHorizontal className="h-3 w-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="border-2 border-border shadow-lg">
                       <AlertDialogTrigger asChild>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">
+                        <DropdownMenuItem className="text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/20 font-medium">
                           <Trash2 className="w-4 h-4 mr-2" />
                           Delete Query
                         </DropdownMenuItem>

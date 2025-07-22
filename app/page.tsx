@@ -99,6 +99,12 @@ export default function Home() {
 
   const handleQuerySelected = (query: any) => {
     setSelectedQuery(query)
+    
+    // If query is null (from delete operation), trigger new query form reset
+    if (query === null) {
+      setNewQueryTrigger(prev => prev + 1)
+    }
+    
     // Auto-close sidebar on mobile when a query is selected
     if (isMobile && isSidebarOpen) {
       console.log('📱 Auto-closing sidebar after query selection on mobile')
