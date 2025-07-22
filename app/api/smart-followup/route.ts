@@ -522,6 +522,7 @@ export async function POST(request: NextRequest) {
         console.error('❌ Error saving question:', questionError)
       } else {
         console.log('✅ Question saved successfully:', questionData?.id)
+        console.log('🕰️ Question saved at timestamp:', new Date().toISOString())
       }
 
       // Save the answer
@@ -547,6 +548,11 @@ export async function POST(request: NextRequest) {
         console.error('❌ Error saving answer:', answerError)
       } else {
         console.log('✅ Answer saved successfully:', answerData?.id)
+        console.log('🕰️ Answer saved at timestamp:', new Date().toISOString())
+        
+        // Add a small delay to ensure database write is committed
+        await new Promise(resolve => setTimeout(resolve, 50))
+        console.log('🕰️ Database write delay completed')
       }
 
     } catch (dbError) {

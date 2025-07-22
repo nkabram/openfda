@@ -91,6 +91,10 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('💾 [PRODUCTION DEBUG] Fetching messages from database for queryId:', queryId)
+    
+    // Add a small delay to account for potential database replication lag
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
     const { data, error } = await supabase
       .from('fda_messages')
       .select('*')
@@ -102,6 +106,16 @@ export async function GET(request: NextRequest) {
       dataCount: data?.length || 0,
       errorMessage: error?.message 
     })
+    
+    // Log all message IDs and types for debugging
+    if (data && data.length > 0) {
+      console.log('💾 [PRODUCTION DEBUG] All messages found:', data.map(msg => ({
+        id: msg.id,
+        type: msg.message_type,
+        createdAt: msg.created_at,
+        contentPreview: msg.content?.substring(0, 30) + '...'
+      })))
+    }
     
     if (data && data.length > 0) {
       console.log('💾 [PRODUCTION DEBUG] First message sample:', {

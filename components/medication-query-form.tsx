@@ -305,9 +305,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       console.log('🚀 [PRODUCTION DEBUG] About to call loadFollowUpMessages...')
       
       try {
-        // Add a small delay to ensure the smart follow-up API has finished saving to database
-        console.log('🚀 [PRODUCTION DEBUG] Waiting 1 second before loading messages...')
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // Add a delay to ensure the smart follow-up API has finished saving to database
+        console.log('🚀 [PRODUCTION DEBUG] Waiting 2 seconds before loading messages...')
+        await new Promise(resolve => setTimeout(resolve, 2000))
         
         await loadFollowUpMessages(response.queryId)
         console.log('🚀 [PRODUCTION DEBUG] loadFollowUpMessages call completed successfully')
