@@ -792,9 +792,9 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
       )}
       
       {/* Smart Follow-up Input */}
-      {response && currentQueryId && !isAdminView && (
+      {response && response.queryId && !isAdminView && (
         <SmartFollowUpInput
-          queryId={currentQueryId}
+          queryId={response.queryId}
           onMessageAdded={handleSmartFollowUpAdded}
           disabled={isLoading}
         />

@@ -199,6 +199,25 @@ export async function POST(request: NextRequest) {
 
     // Get the original query and conversation context
     console.log('🔍 Looking for query:', queryId, 'for user:', user.id)
+    console.log('🔍 QueryId type:', typeof queryId, 'length:', queryId?.length)
+    
+    // First, check if the query exists at all (without user filter)
+    const { data: queryExists, error: existsError } = await supabase
+      .from('fda_queries')
+      .select('id, user_id, user_query, medication_name')
+      .eq('id', queryId)
+      .single()
+    
+    console.log('🔍 Query exists check:', { queryExists: !!queryExists, existsError })
+    if (queryExists) {
+      console.log('🔍 Found query belongs to user:', queryExists.user_id, 'current user:', user.id)
+      console.log('🔍 Query details:', { 
+        medication: queryExists.medication_name, 
+        query: queryExists.user_query?.substring(0, 50) + '...' 
+      })
+    }
+    
+    // Now get the query with user filter
     const { data: originalQuery, error: queryError } = await supabase
       .from('fda_queries')
       .select('*')
@@ -206,13 +225,30 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single()
 
-    console.log('📊 Query result:', { originalQuery: !!originalQuery, queryError })
+    console.log('📊 User-filtered query result:', { originalQuery: !!originalQuery, queryError })
     if (queryError || !originalQuery) {
       console.log('❌ Query not found or error:', queryError)
-      return NextResponse.json(
-        { error: 'Query not found or unauthorized' },
-        { status: 404 }
-      )
+      
+      // Provide more specific error messages
+      if (queryExists && queryExists.user_id !== user.id) {
+        console.log('🚫 Query belongs to different user - unauthorized access attempt')
+        return NextResponse.json(
+          { error: 'Query not found or unauthorized - query belongs to different user' },
+          { status: 404 }
+        )
+      } else if (!queryExists) {
+        console.log('🚫 Query does not exist in database')
+        return NextResponse.json(
+          { error: 'Query not found - query does not exist' },
+          { status: 404 }
+        )
+      } else {
+        console.log('🚫 Unknown error accessing query')
+        return NextResponse.json(
+          { error: 'Query not found or unauthorized - unknown error' },
+          { status: 404 }
+        )
+      }
     }
 
     // Get previous messages for context
