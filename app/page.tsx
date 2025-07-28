@@ -151,7 +151,7 @@ export default function Home() {
   return (
     <>
       <AuthGuard>
-        <div className="min-h-screen bg-background relative">
+        <div className="min-h-screen bg-slate-50 dark:bg-background relative">{/* Inverted light theme - darker page background */}
           {/* Mobile/Tablet Query History Overlay */}
           {isMobile && (
             <div className={`
@@ -175,7 +175,7 @@ export default function Home() {
                     onClick={() => toggleSidebar(false)}
                     className="h-8 w-8 p-0"
                   >
-                    <ChevronDown className="h-4 w-4" />
+                    <PanelLeft className="h-4 w-4" />
                   </Button>
                 </div>
                 

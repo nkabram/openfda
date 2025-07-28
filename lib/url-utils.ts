@@ -5,10 +5,13 @@ import { NextRequest } from 'next/server'
  * This works in both development and production environments
  */
 export function getBaseUrl(request: NextRequest): string {
-  // In production, use the forwarded protocol and host
+  // Priority order: x-forwarded-host (for proxied environments like Codespaces), then host
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const host = forwardedHost || request.headers.get('host') || 'localhost:3000'
+  
+  // Use forwarded protocol if available, otherwise detect based on host
   const protocol = request.headers.get('x-forwarded-proto') || 
-                  (request.headers.get('host')?.includes('localhost') ? 'http' : 'https')
-  const host = request.headers.get('host') || 'localhost:3000'
+                  (host.includes('localhost') ? 'http' : 'https')
   
   return `${protocol}://${host}`
 }

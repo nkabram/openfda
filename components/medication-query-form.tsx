@@ -356,7 +356,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Query Input Section */}
       <Card className="border-0 shadow-none">
-        <CardContent className="p-6 bg-background">
+        <CardContent className="p-0">{/* Removed padding to align with response section */}
             {/* User Information in Admin View */}
             {isAdminView && (selectedQuery?.profiles || viewOnlyQuery) && (() => {
               const queryData = viewOnlyQuery || selectedQuery
@@ -397,7 +397,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="min-h-[120px] resize-none bg-background text-foreground placeholder:text-muted-foreground border-input focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
+                    className="min-h-[120px] resize-none bg-white dark:bg-slate-700/70 border border-slate-300 dark:border-slate-600/60 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none focus:border-ring/50"
                     disabled={isLoading}
                   />
                 </div>

@@ -358,7 +358,7 @@ function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: Smart
 
   return (
     <Card className="border-0 shadow-none">
-      <CardContent className="p-6 bg-background">
+      <CardContent className="p-0 bg-background">
         <div className="space-y-4">
           {/* Intent Confirmation Dialog */}
           {showConfirmation && (
@@ -405,7 +405,7 @@ function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: Smart
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="min-h-[60px] resize-none bg-background text-foreground placeholder:text-muted-foreground border-input"
+              className="min-h-[60px] resize-none bg-white dark:bg-slate-700/70 border border-slate-300 dark:border-slate-600/60 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none focus:border-ring/50"
               disabled={isLoading || disabled}
             />
           </form>

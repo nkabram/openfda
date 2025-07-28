@@ -305,6 +305,7 @@ export async function POST(request: NextRequest) {
 
     // Get the base URL from request headers for proper production support
     const baseUrl = getBaseUrl(request)
+    console.log('🔗 Base URL for internal calls:', baseUrl)
 
     // Step 3: Handle the query based on intent
     if (isWebSearchIntent) {
