@@ -46,19 +46,6 @@ export async function GET(request: NextRequest) {
 
 
     if (viewType === 'admin') {
-      // First check if user is approved
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('is_approved')
-        .eq('id', user.id)
-        .single()
-      
-      if (profileError || !profileData?.is_approved) {
-        return NextResponse.json(
-          { error: 'Forbidden - User not approved' },
-          { status: 403 }
-        )
-      }
 
       // Then check if user is admin - don't use single() to avoid errors
       const { data: adminData } = await supabase

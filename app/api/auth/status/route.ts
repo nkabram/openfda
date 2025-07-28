@@ -94,15 +94,12 @@ export async function GET(request: Request) {
     console.log('📊 Status check results:', {
       userId: user.id,
       email: user.email,
-      profileApproved: profileData?.is_approved,
       adminRecords: adminData?.length || 0
     })
 
     const isAdmin = adminData && adminData.length > 0
-    const isApproved = isAdmin || profileData?.is_approved || false
 
     return NextResponse.json({
-      isApproved,
       isAdmin,
       email: user.email,
       userId: user.id

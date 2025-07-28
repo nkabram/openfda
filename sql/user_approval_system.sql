@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   email TEXT,
   full_name TEXT,
   avatar_url TEXT,
-  is_approved BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -149,6 +148,5 @@ CREATE POLICY "Users can delete own messages" ON fda_messages
   FOR DELETE USING (auth.uid() = user_id);
 
 -- 12. Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_profiles_is_approved ON profiles(is_approved);
 CREATE INDEX IF NOT EXISTS idx_profiles_created_at ON profiles(created_at);
 CREATE INDEX IF NOT EXISTS idx_admins_is_admin ON admins(is_admin);

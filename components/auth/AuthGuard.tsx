@@ -10,22 +10,13 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
-  const { user, loading, isApproved, approvalLoading, isAdmin } = useAuth()
-  const router = useRouter()
+  const { user, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
     console.log('🛡️ AuthGuard initialized')
   }, [])
-
-  // Handle redirect for unapproved users
-  useEffect(() => {
-    if (isClient && !isApproved && !isAdmin && !approvalLoading && !loading && user) {
-      console.log('🚀 Redirecting to waiting-approval page')
-      router.push('/waiting-approval')
-    }
-  }, [isClient, isApproved, isAdmin, approvalLoading, loading, user, router])
 
   // During server-side rendering or hydration, return a simple div
   // This prevents hydration errors by ensuring the server and client render the same content
@@ -37,10 +28,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   console.log('🛡️ AuthGuard state:', { 
     isClient, 
     loading, 
-    hasUser: !!user, 
-    isApproved, 
-    approvalLoading, 
-    isAdmin 
+    hasUser: !!user 
   })
 
   // Show loading while auth is initializing
@@ -62,44 +50,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return <LandingPage />;
   }
 
-  // User exists but approval status is loading
-  if (approvalLoading) {
-    console.log('🛡️ AuthGuard: Approval loading...')
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Checking approval status...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // User is approved or admin - show content
-  if (isApproved || isAdmin) {
-    console.log('🔑 AuthGuard: User approved, showing content', {
-      isApproved,
-      isAdmin,
-      email: user?.email,
-      userId: user?.id
-    })
-    return <>{children}</>;
-  }
-
-  // User not approved - redirect to waiting page
-  console.log('🔑 AuthGuard: User not approved, redirecting', {
-    isApproved,
-    isAdmin,
+  // User exists - show content
+  console.log('🔑 AuthGuard: User authenticated, showing content', {
     email: user?.email,
     userId: user?.id
   })
-
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-        <p className="mt-2 text-sm text-muted-foreground">Redirecting...</p>
-      </div>
-    </div>
-  ); // Show loader while redirecting
+  return <>{children}</>;
 }

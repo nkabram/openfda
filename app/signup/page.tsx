@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 
 export default function SignUpPage() {
-  const { signInWithGoogle, signUpWithEmail, loading } = useAuth()
+  const { signInWithGoogle, signUpWithEmail, loading, user } = useAuth()
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,6 +21,14 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (user && !loading) {
+      console.log('🔄 User authenticated, redirecting to home page')
+      router.replace('/')
+    }
+  }, [user, loading, router])
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,6 +68,7 @@ export default function SignUpPage() {
     
     try {
       await signInWithGoogle()
+      // Don't need to manually redirect here as useEffect will handle it
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google')
     }

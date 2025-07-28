@@ -11,8 +11,7 @@ import { ProjectConsentModal } from '../components/ProjectConsentModal'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
-import { PanelLeft, PanelLeftOpen, Plus, User, Users, Settings, Search } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+import { PanelLeft, PanelLeftOpen, Plus, User, Users, Settings, Search, ChevronDown } from 'lucide-react'
 import { useQueryCache } from '@/contexts/QueryCacheContext'
 import { ThemeToggle } from '@/components/theme-toggle'
 
@@ -39,21 +38,21 @@ export default function Home() {
   const [drugSearchFilter, setDrugSearchFilter] = useState('')
   const [sidebarWidth, setSidebarWidth] = useState(320)
   const [isResizing, setIsResizing] = useState(false)
-  const { isAdmin } = useAuth()
   
 
 
   // Check if mobile on mount and window resize
   useEffect(() => {
     const checkMobile = () => {
-      const mobile = window.innerWidth < 768
+      const mobile = window.innerWidth < 1024
       console.log('📱 Mobile check:', { width: window.innerWidth, mobile, currentIsMobile: isMobile })
+      
+      // Only update mobile state, don't auto-manage sidebar
+      const prevMobile = isMobile
       setIsMobile(mobile)
-      // Auto-close sidebar on mobile, auto-open on desktop
-      if (mobile && isSidebarOpen) {
-        console.log('📱 Auto-closing sidebar on mobile')
-        setIsSidebarOpen(false)
-      } else if (!mobile && !isSidebarOpen) {
+      
+      // Only auto-open sidebar when transitioning from mobile to desktop
+      if (prevMobile && !mobile && !isSidebarOpen) {
         const savedState = localStorage.getItem('sidebarOpen')
         if (savedState !== null) {
           setIsSidebarOpen(JSON.parse(savedState))
@@ -82,6 +81,8 @@ export default function Home() {
   const toggleSidebar = (open: boolean) => {
     console.log('🔄 Toggling sidebar:', { open, isMobile, currentState: isSidebarOpen })
     setIsSidebarOpen(open)
+    
+    // Save state only for desktop
     if (!isMobile) {
       localStorage.setItem('sidebarOpen', JSON.stringify(open))
     }
@@ -105,9 +106,9 @@ export default function Home() {
       setNewQueryTrigger(prev => prev + 1)
     }
     
-    // Auto-close sidebar on mobile when a query is selected
+    // Auto-close overlay on mobile/tablet when a query is selected (but only if user didn't manually open it)
     if (isMobile && isSidebarOpen) {
-      console.log('📱 Auto-closing sidebar after query selection on mobile')
+      console.log('📱 Auto-closing overlay after query selection on mobile/tablet')
       toggleSidebar(false)
     }
   }
@@ -151,88 +152,132 @@ export default function Home() {
     <>
       <AuthGuard>
         <div className="min-h-screen bg-background relative">
-          {/* Mobile overlay backdrop */}
-          {isMobile && isSidebarOpen && (
-            <div 
-              className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300" 
-              onClick={() => {
-                console.log('📱 Backdrop clicked - closing sidebar')
-                toggleSidebar(false)
-              }}
-            />
-          )}
-          
-          <div className="flex">
-            {/* Sidebar */}
+          {/* Mobile/Tablet Query History Overlay */}
+          {isMobile && (
             <div className={`
-              transition-all duration-300 ease-in-out
-              bg-background border-r border-border relative
-              ${isMobile 
-                ? `fixed left-0 top-0 h-full z-50 transform ${
-                    isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-                  }` 
-                : `${isSidebarOpen ? '' : 'w-0'} overflow-hidden`
-              }
-              ${isSidebarOpen ? 'shadow-2xl' : ''}
-            `}
-            style={{
-              width: isMobile ? '280px' : (isSidebarOpen ? `${sidebarWidth}px` : '0px')
-            }}>
-            <div className="h-full flex flex-col">
-              {/* Header with collapse button and search */}
-              <div className="p-3 border-b border-border bg-muted/30">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold text-foreground">Query History</h2>
+              fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out
+              ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
+              {/* Backdrop */}
+              <div 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+                onClick={() => toggleSidebar(false)}
+              />
+              
+              {/* Overlay Content */}
+              <div className="absolute inset-y-0 left-0 w-full max-w-sm bg-background shadow-2xl flex flex-col">
+                {/* Header */}
+                <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-foreground">Query History</h2>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleSidebar(false)}
-                    title="Collapse sidebar"
-                    className="h-7 w-7 p-0 hover:bg-muted transition-colors"
+                    className="h-8 w-8 p-0"
                   >
-                    <PanelLeft className="h-3.5 w-3.5" />
+                    <ChevronDown className="h-4 w-4" />
                   </Button>
                 </div>
-                {/* Drug search filter */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search medications..."
-                    value={drugSearchFilter}
-                    onChange={(e) => setDrugSearchFilter(e.target.value)}
-                    className="pl-10 h-9 text-sm"
+                
+                {/* Search */}
+                <div className="p-4 border-b border-border">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search medications..."
+                      value={drugSearchFilter}
+                      onChange={(e) => setDrugSearchFilter(e.target.value)}
+                      className="pl-10 h-10"
+                    />
+                  </div>
+                </div>
+                
+                {/* Query History List */}
+                <div className="flex-1 overflow-hidden">
+                  <QueryHistory 
+                    refreshTrigger={queryRefreshTrigger} 
+                    onQuerySelected={handleQuerySelected}
+                    selectedQueryId={selectedQuery?.id}
+                    searchFilter={drugSearchFilter}
+                    isMobileOverlay={true}
                   />
                 </div>
               </div>
-              
-              {/* Query History List */}
-              <div className="flex-1 overflow-hidden">
-                <QueryHistory 
-                  refreshTrigger={queryRefreshTrigger} 
-                  onQuerySelected={handleQuerySelected}
-                  selectedQueryId={selectedQuery?.id}
-                  searchFilter={drugSearchFilter}
-                />
-              </div>
             </div>
-            
-            {/* Resize handle - only show on desktop when sidebar is open */}
-            {!isMobile && isSidebarOpen && (
-              <div 
-                className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-border hover:bg-primary/50 transition-colors group"
-                onMouseDown={handleMouseDown}
-              >
-                <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-3 h-8 bg-muted border border-border rounded opacity-0 group-hover:opacity-100 transition-opacity" />
+          )}
+          
+          {/* Desktop Layout */}
+          <div className="flex h-screen">
+            {/* Desktop Sidebar */}
+            {!isMobile && (
+              <div className={`
+                transition-all duration-300 ease-in-out
+                bg-background border-r border-border relative
+                ${isSidebarOpen ? '' : 'w-0'} overflow-hidden
+                ${isSidebarOpen ? 'shadow-2xl' : ''} flex-shrink-0
+              `}
+              style={{
+                width: isSidebarOpen ? `${sidebarWidth}px` : '0px'
+              }}>
+                <div className="h-full flex flex-col">
+                  {/* Header with collapse button and search */}
+                  <div className="p-3 border-b border-border bg-muted/30">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-sm font-semibold text-foreground">Query History</h2>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleSidebar(false)}
+                        title="Collapse sidebar"
+                        className="h-7 w-7 p-0 hover:bg-muted transition-colors"
+                      >
+                        <PanelLeft className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {/* Drug search filter */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search medications..."
+                        value={drugSearchFilter}
+                        onChange={(e) => setDrugSearchFilter(e.target.value)}
+                        className="pl-10 h-9 text-sm"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Query History List */}
+                  <div className="flex-1 overflow-hidden">
+                    <QueryHistory 
+                      refreshTrigger={queryRefreshTrigger} 
+                      onQuerySelected={handleQuerySelected}
+                      selectedQueryId={selectedQuery?.id}
+                      searchFilter={drugSearchFilter}
+                      isMobileOverlay={false}
+                    />
+                  </div>
+                </div>
+                
+                {/* Resize handle - only show on desktop when sidebar is open */}
+                {isSidebarOpen && (
+                  <div 
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-border hover:bg-primary/50 transition-colors group"
+                    onMouseDown={handleMouseDown}
+                  >
+                    <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-3 h-8 bg-muted border border-border rounded opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                )}
               </div>
             )}
-          </div>
 
-            {/* Main Content */}
-            <div className="flex-1 min-w-0"> {/* min-w-0 prevents flex overflow */}
-              <div className="p-2 sm:p-4 border-b border-border flex items-center justify-between">
+            {/* Main Content - Always takes remaining space */}
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+              {/* Header Bar */}
+              <div className="p-2 lg:p-4 border-b border-border flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {/* Mobile toggle button - always show on mobile */}
+                  {/* Mobile/Tablet toggle button */}
                   {isMobile && (
                     <Button
                       variant="ghost"
@@ -244,7 +289,7 @@ export default function Home() {
                       title="View Query History"
                       className="hover:bg-muted transition-colors flex-shrink-0 relative"
                     >
-                      <PanelLeftOpen className="h-4 w-4" />
+                      <PanelLeftOpen className="h-5 w-5" />
                       {/* Small indicator dot to show there are queries */}
                       <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full opacity-60" />
                     </Button>
@@ -274,7 +319,7 @@ export default function Home() {
                     </Button>
                   )}
                 </div>
-                <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+                <div className="flex items-center gap-1 lg:gap-3 flex-shrink-0">
                   {/* Mobile New Query Button */}
                   {isMobile && (
                     <Button
@@ -284,30 +329,18 @@ export default function Home() {
                       className="hover:bg-muted transition-colors"
                       title="New Query"
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-5 w-5" />
                     </Button>
                   )}
 
-                  {/* Admin Link - only show for admin users */}
-                  {isAdmin && (
-                    <Button
-                      variant="outline"
-                      size={isMobile ? "icon" : "sm"}
-                      onClick={() => window.open('/admin', '_blank')}
-                      className="hover:bg-muted transition-colors"
-                      title="Admin Dashboard"
-                    >
-                      <Settings className="h-4 w-4" />
-                      {!isMobile && <span className="ml-2">Admin</span>}
-                    </Button>
-                  )}
                   <MedicationQueryHelpModal />
                   <ThemeToggle />
                   <AuthWrapper />
                 </div>
               </div>
               
-              <div className="p-3 sm:p-6">
+              {/* Form Area - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-3 lg:p-6">
                 <MedicationQueryForm 
                   onQuerySaved={handleQuerySaved}
                   selectedQuery={selectedQuery}
@@ -315,15 +348,13 @@ export default function Home() {
                 />
               </div>
             </div>
-        </div>
-        
+          </div>
+          
           {/* Fixed Disclaimer and Project Info - responsive positioning */}
-          <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-30 flex flex-col items-end gap-2">
+          <div className="fixed bottom-2 right-2 lg:bottom-4 lg:right-4 z-30 flex flex-col items-end gap-2">
             <ProjectConsentModal />
             <DisclaimerModal />
           </div>
-          
-
         </div>
       </AuthGuard>
     </>

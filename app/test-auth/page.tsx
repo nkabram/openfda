@@ -9,12 +9,8 @@ export default function TestAuthPage() {
   const { 
     user, 
     loading, 
-    isApproved, 
-    approvalLoading, 
-    isAdmin, 
     signInWithGoogle, 
-    signOut,
-    checkApprovalStatus 
+    signOut
   } = useAuth()
   
   const [isClient, setIsClient] = useState(false)
@@ -26,8 +22,8 @@ export default function TestAuthPage() {
   }, [])
 
   useEffect(() => {
-    addLog(`Auth state changed - User: ${user?.email || 'none'}, Approved: ${isApproved}, Admin: ${isAdmin}`)
-  }, [user, isApproved, isAdmin])
+    addLog(`Auth state changed - User: ${user?.email || 'none'}`)
+  }, [user])
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString()
@@ -35,9 +31,7 @@ export default function TestAuthPage() {
   }
 
   const handleRefreshStatus = async () => {
-    addLog('Manually refreshing approval status...')
-    await checkApprovalStatus()
-    addLog('Refresh complete')
+    addLog('Auth status refresh no longer needed - approval system removed')
   }
 
   if (!isClient) {
@@ -55,11 +49,8 @@ export default function TestAuthPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <div><strong>Loading:</strong> {String(loading)}</div>
-            <div><strong>Approval Loading:</strong> {String(approvalLoading)}</div>
             <div><strong>User:</strong> {user?.email || 'Not logged in'}</div>
             <div><strong>User ID:</strong> {user?.id || 'N/A'}</div>
-            <div><strong>Is Approved:</strong> {String(isApproved)}</div>
-            <div><strong>Is Admin:</strong> {String(isAdmin)}</div>
           </CardContent>
         </Card>
 
@@ -101,9 +92,6 @@ export default function TestAuthPage() {
           <CardContent className="space-y-2">
             <div>
               <a href="/" className="text-blue-500 hover:underline">Go to Main App (with AuthGuard)</a>
-            </div>
-            <div>
-              <a href="/waiting-approval" className="text-blue-500 hover:underline">Go to Waiting Approval Page</a>
             </div>
             <div>
               <a href="/admin" className="text-blue-500 hover:underline">Go to Admin Dashboard</a>

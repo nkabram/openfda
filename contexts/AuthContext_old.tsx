@@ -35,6 +35,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession()
       setSession(session)
       setUser(session?.user ?? null)
+      
+      setLoading(false)
+    }
+
+    initAuth()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('� Auth state changed:', event, session?.user?.email || 'No session')
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false) // Set loading to false after auth state change
+
+  useEffect(() => {
+    if (!isClient) return
+
+    const initAuth = async () => {
+      console.log('🚀 Initializing auth...')
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log('📱 Initial session:', session?.user?.email || 'No session')
+      
+      setSession(session)
+      setUser(session?.user ?? null)
+      
+      if (session?.user) {
+        await checkAdminStatus(session.user.id)
+      }
+      
       setLoading(false)
     }
 
@@ -44,7 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🔄 Auth state changed:', event, session?.user?.email || 'No session')
       setSession(session)
       setUser(session?.user ?? null)
-      setLoading(false)
+      
+      if (session?.user) {
+        // User signed in, set loading to false
+        setLoading(false)
+      } else {
+        setLoading(false) // Set loading to false when there's no user
+      }
       
       // Clean up URL fragments after successful authentication
       if (event === 'SIGNED_IN' && typeof window !== 'undefined') {
@@ -75,79 +108,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
     
     if (error) {
-      console.error('🚨 Google sign in error:', error)
-      throw error
+      console.error('❌ Error signing in with Google:', error.message)
+      console.error('❌ Error details:', error)
+      
+      if (error.message.includes('redirect') || error.message.includes('URL')) {
+        console.error('🚨 REDIRECT URL ERROR:')
+        console.error('🚨 Make sure the following URL is added to your Supabase project\'s OAuth settings:')
+        console.error('🚨', authConfig.redirectUrl)
+        console.error('🚨 Go to: Supabase Dashboard > Authentication > URL Configuration > Redirect URLs')
+      }
+    } else {
+      console.log('✅ Google OAuth initiated successfully')
     }
   }
 
   const signInWithEmail = async (email: string, password: string) => {
-    console.log('📧 Starting email sign in for:', email)
-    
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-
-      if (error) {
-        console.error('🚨 Email sign in error:', error)
-        return { error }
-      }
-
-      console.log('✅ Email sign in successful')
-      return { error: null }
-    } catch (error) {
-      console.error('🚨 Unexpected error during email sign in:', error)
-      return { error }
-    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { error }
   }
 
   const signUpWithEmail = async (email: string, password: string, fullName?: string) => {
-    console.log('📧 Starting email sign up for:', email)
-    
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName || '',
-          }
-        }
-      })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
+    })
 
-      if (error) {
-        console.error('🚨 Email sign up error:', error)
-        return { error }
-      }
-
-      console.log('✅ Email sign up successful - check email for confirmation')
-      return { error: null }
-    } catch (error) {
-      console.error('🚨 Unexpected error during email sign up:', error)
-      return { error }
-    }
+    return { error }
   }
 
   const resetPassword = async (email: string) => {
-    console.log('🔄 Starting password reset for:', email)
+    const authConfig = getAuthConfig()
+    const resetUrl = authConfig.redirectUrl.replace('/auth/callback', '/reset-password')
     
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
-      })
-
-      if (error) {
-        console.error('🚨 Password reset error:', error)
-        return { error }
-      }
-
-      console.log('✅ Password reset email sent')
-      return { error: null }
-    } catch (error) {
-      console.error('🚨 Unexpected error during password reset:', error)
-      return { error }
+    console.log('🔄 Sending password reset email to:', email)
+    console.log('↩️ Reset redirect URL:', resetUrl)
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: resetUrl,
+    })
+    
+    if (error) {
+      console.error('❌ Password reset error:', error)
+    } else {
+      console.log('✅ Password reset email sent successfully')
     }
+    
+    return { error }
   }
 
   const signOut = async () => {

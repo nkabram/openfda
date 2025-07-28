@@ -56,6 +56,10 @@ export function useQueries(isAdmin: boolean = false, options: UseQueriesOptions 
   const { session } = useAuth()
   const { cache, addQuery, updateQuery: updateQueryInCache, removeQuery, setUserQueries, setAdminQueries, refreshCache, clearCache, getCacheStats } = useQueryCache()
   
+  // Prevent infinite loops
+  const fetchInProgressRef = useRef(false)
+  const hasInitializedRef = useRef(false)
+  
   // Debouncing refs
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingUpdatesRef = useRef<Array<() => void>>([])
@@ -90,6 +94,12 @@ export function useQueries(isAdmin: boolean = false, options: UseQueriesOptions 
       return
     }
 
+    // Prevent infinite loops
+    if (fetchInProgressRef.current) {
+      console.log('useQueries: Fetch already in progress, skipping')
+      return
+    }
+
     // Check cache without depending on cache object to avoid infinite loops
     const cacheStats = getCacheStats()
     const relevantCount = isAdmin ? cacheStats.adminCount : cacheStats.userCount
@@ -103,6 +113,8 @@ export function useQueries(isAdmin: boolean = false, options: UseQueriesOptions 
     }
 
     console.log(`useQueries: Fetching fresh queries (force: ${force}, cached: ${relevantCount}, expired: ${cacheExpired})`)
+    
+    fetchInProgressRef.current = true
     setLoading(true)
     setError(null)
 
@@ -137,15 +149,17 @@ export function useQueries(isAdmin: boolean = false, options: UseQueriesOptions 
       onError?.(error)
     } finally {
       setLoading(false)
+      fetchInProgressRef.current = false
     }
   }, [session?.access_token, isAdmin, setUserQueries, setAdminQueries, onError, getCacheStats])
 
-  // Auto-fetch on mount and when dependencies change
+  // Auto-fetch on mount and when user/session changes
   useEffect(() => {
-    if (autoFetch) {
+    if (autoFetch && session?.access_token && !hasInitializedRef.current) {
+      hasInitializedRef.current = true
       fetchQueries()
     }
-  }, [fetchQueries, autoFetch])
+  }, [session?.access_token, autoFetch]) // Remove fetchQueries from deps to prevent infinite loop
 
   // Wrapper functions for cache operations
   const addQueryToCache = useCallback((query: any) => {
@@ -233,9 +247,12 @@ export function useQueries(isAdmin: boolean = false, options: UseQueriesOptions 
         clearTimeout(debounceTimeoutRef.current)
       }
       // Execute any pending updates before cleanup
-      executeBatchedUpdates()
+      if (pendingUpdatesRef.current.length > 0) {
+        pendingUpdatesRef.current.forEach(updateFn => updateFn())
+        pendingUpdatesRef.current = []
+      }
     }
-  }, [executeBatchedUpdates])
+  }, []) // Empty deps - only run on unmount
 
   return {
     queries: processedQueries,

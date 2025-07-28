@@ -1,7 +1,3 @@
--- SQL function to check user approval and admin status
--- This replaces the Edge Function with a direct SQL function
-
-CREATE OR REPLACE FUNCTION public.check_user_status(input_user_id UUID DEFAULT NULL)
 RETURNS TABLE (
   is_approved BOOLEAN,
   is_admin BOOLEAN,

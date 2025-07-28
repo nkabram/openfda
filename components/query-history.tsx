@@ -26,9 +26,10 @@ interface QueryHistoryProps {
   onQuerySelected?: (query: Query) => void
   selectedQueryId?: string
   searchFilter?: string
+  isMobileOverlay?: boolean
 }
 
-export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId, searchFilter }: QueryHistoryProps) {
+export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId, searchFilter, isMobileOverlay = false }: QueryHistoryProps) {
   const { toast } = useToast()
   const {
     queries,
@@ -152,11 +153,11 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId,
   return (
     <div className="h-full">
       <ScrollArea className="h-full">
-        <div className="p-3 space-y-2">
+        <div className={`${isMobileOverlay ? 'p-2' : 'p-3'} space-y-2`}>
           {filteredQueries.map((query) => (
             <div 
               key={query.id} 
-              className={`group p-3 rounded-md border cursor-pointer hover:bg-muted/20 transition-all duration-200 ${
+              className={`group ${isMobileOverlay ? 'p-4' : 'p-3'} rounded-md border cursor-pointer hover:bg-muted/20 transition-all duration-200 ${
                 selectedQueryId === query.id ? 'ring-1 ring-primary bg-primary/5 border-primary/30' : 'bg-card hover:border-muted-foreground/20'
               }`}
               onClick={() => onQuerySelected?.(query)}
@@ -164,26 +165,26 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId,
               {/* Main query text with drug name or general icon */}
               <div className="mb-2">
                 <div className="flex items-start gap-2 mb-1">
-                  <h3 className="text-sm font-medium text-foreground leading-tight line-clamp-2 flex-1">
-                    {truncateText(query.user_query, 85)}
+                  <h3 className={`${isMobileOverlay ? 'text-base' : 'text-sm'} font-medium text-foreground leading-tight line-clamp-2 flex-1`}>
+                    {truncateText(query.user_query, isMobileOverlay ? 120 : 85)}
                   </h3>
                   {query.medication_name ? (
-                    <div className="flex items-center gap-1 text-xs font-medium shrink-0 text-blue-600 dark:text-blue-400">
-                      <Pill className="w-3 h-3" />
-                      <span className="truncate max-w-20">{query.medication_name}</span>
+                    <div className={`flex items-center gap-1 ${isMobileOverlay ? 'text-sm' : 'text-xs'} font-medium shrink-0 text-blue-600 dark:text-blue-400`}>
+                      <Pill className={`${isMobileOverlay ? 'w-4 h-4' : 'w-3 h-3'}`} />
+                      <span className={`truncate ${isMobileOverlay ? 'max-w-24' : 'max-w-20'}`}>{query.medication_name}</span>
                     </div>
                   ) : (
-                    <div className="flex items-center text-xs text-muted-foreground/60 shrink-0">
-                      <MessageSquare className="w-3 h-3" />
+                    <div className={`flex items-center ${isMobileOverlay ? 'text-sm' : 'text-xs'} text-muted-foreground/60 shrink-0`}>
+                      <MessageSquare className={`${isMobileOverlay ? 'w-4 h-4' : 'w-3 h-3'}`} />
                     </div>
                   )}
                 </div>
               </div>
               
               {/* Metadata row */}
-              <div className="flex items-center justify-between text-xs">
+              <div className={`flex items-center justify-between ${isMobileOverlay ? 'text-sm' : 'text-xs'}`}>
                 <div className="flex items-center text-muted-foreground">
-                  <Calendar className="w-3 h-3 mr-1" />
+                  <Calendar className={`${isMobileOverlay ? 'w-4 h-4' : 'w-3 h-3'} mr-1`} />
                   <span>{formatDate(query.created_at)}</span>
                 </div>
                 <AlertDialog>
@@ -192,10 +193,10 @@ export function QueryHistory({ refreshTrigger, onQuerySelected, selectedQueryId,
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className={`${isMobileOverlay ? 'h-8 w-8' : 'h-6 w-6'} p-0 opacity-0 group-hover:opacity-100 transition-opacity`}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <MoreHorizontal className="h-3 w-3" />
+                        <MoreHorizontal className={`${isMobileOverlay ? 'h-4 w-4' : 'h-3 w-3'}`} />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="border-2 border-border shadow-lg">

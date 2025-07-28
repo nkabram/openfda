@@ -5,10 +5,9 @@ import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
 export function AuthDebugger() {
-  const { user, loading, isApproved, approvalLoading, isAdmin, checkApprovalStatus } = useAuth()
+  const { user, loading, isAdmin } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const pathname = usePathname()
-  const [refreshCount, setRefreshCount] = useState(0)
 
   useEffect(() => {
     setIsClient(true)
@@ -17,12 +16,6 @@ export function AuthDebugger() {
   // Only show in development
   if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
     return null
-  }
-
-  const handleRefresh = async () => {
-    console.log('🔄 Manually refreshing approval status...')
-    await checkApprovalStatus()
-    setRefreshCount(prev => prev + 1)
   }
 
   return (
@@ -34,16 +27,7 @@ export function AuthDebugger() {
       <div>hasUser: {String(!!user)}</div>
       <div>userId: {user?.id?.slice(0, 8) || 'none'}...</div>
       <div>userEmail: {user?.email || 'none'}</div>
-      <div>isApproved: {String(isApproved)}</div>
-      <div>approvalLoading: {String(approvalLoading)}</div>
       <div>isAdmin: {String(isAdmin)}</div>
-      <div>refreshCount: {refreshCount}</div>
-      <button 
-        onClick={handleRefresh}
-        className="mt-2 px-2 py-1 bg-blue-500 hover:bg-blue-600 rounded text-white"
-      >
-        Refresh Status
-      </button>
     </div>
   )
 }

@@ -1,7 +1,6 @@
 -- Admin functions for user management
 -- These functions are designed to be called by admin users only
 
--- Function to get pending users (bypasses RLS for admin users)
 CREATE OR REPLACE FUNCTION public.get_pending_users()
 RETURNS TABLE (
   id UUID,
@@ -37,12 +36,10 @@ BEGIN
     p.full_name,
     p.created_at
   FROM profiles p
-  WHERE p.is_approved = FALSE
   ORDER BY p.created_at ASC;
 END;
 $$;
 
--- Function to approve/reject users (bypasses RLS for admin users)
 CREATE OR REPLACE FUNCTION public.admin_update_user_approval(
   target_user_id UUID,
   approve_user BOOLEAN
@@ -69,12 +66,6 @@ BEGIN
     RETURN FALSE;
   END IF;
   
-  -- Update user approval status
-  UPDATE profiles 
-  SET 
-    is_approved = approve_user,
-    updated_at = NOW()
-  WHERE id = target_user_id;
   
   -- Check if update was successful
   GET DIAGNOSTICS update_success = FOUND;
@@ -83,6 +74,5 @@ BEGIN
 END;
 $$;
 
--- Grant execute permissions to authenticated users
 GRANT EXECUTE ON FUNCTION public.get_pending_users() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_update_user_approval(UUID, BOOLEAN) TO authenticated;
