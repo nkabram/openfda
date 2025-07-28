@@ -264,7 +264,8 @@ export async function POST(request: NextRequest) {
     }
 
     const context = fdaData ? formatFDAContext(fdaData, medication, intents || []) : ''
-
+    
+    // TODO: review and update system prompt
     const completion = await openai.chat.completions.create({
       model: 'gpt-4.1-nano',
       messages: [
