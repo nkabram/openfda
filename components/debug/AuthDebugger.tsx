@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
 export function AuthDebugger() {
-  const { user, loading, isAdmin } = useAuth()
+  const { user, loading } = useAuth()
   const [isClient, setIsClient] = useState(false)
   const pathname = usePathname()
 
@@ -27,7 +27,7 @@ export function AuthDebugger() {
       <div>hasUser: {String(!!user)}</div>
       <div>userId: {user?.id?.slice(0, 8) || 'none'}...</div>
       <div>userEmail: {user?.email || 'none'}</div>
-      <div>isAdmin: {String(isAdmin)}</div>
+
     </div>
   )
 }
