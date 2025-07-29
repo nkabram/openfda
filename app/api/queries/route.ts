@@ -65,7 +65,11 @@ export async function GET(request: NextRequest) {
       // User is admin, fetch all queries
       const { data: queries, error: queriesError } = await supabase
         .from('fda_queries')
-        .select('*')
+        .select(`
+          *,
+          message:fda_messages!inner(id)
+        `)
+        .eq('message.follow_up_mode', 'original_query')
         .order('created_at', { ascending: false })
       
       if (queriesError) {
@@ -97,6 +101,7 @@ export async function GET(request: NextRequest) {
       // Combine queries with user info
       const queriesWithUserInfo = queries?.map(query => ({
         ...query,
+        messageId: query.message[0]?.id || null,
         profiles: profilesMap[query.user_id] || null,
         user_email: profilesMap[query.user_id]?.email || 'Unknown',
         user_name: profilesMap[query.user_id]?.full_name || 'Unknown User'
@@ -109,8 +114,12 @@ export async function GET(request: NextRequest) {
 
       const { data, error } = await supabase
         .from('fda_queries')
-        .select('*')
+        .select(`
+          *,
+          message:fda_messages!inner(id)
+        `)
         .eq('user_id', user.id)
+        .eq('message.follow_up_mode', 'original_query')
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -123,7 +132,8 @@ export async function GET(request: NextRequest) {
       }
 
 
-      return NextResponse.json({ queries: data || [] })
+      const queriesWithMessageId = data?.map(q => ({ ...q, messageId: q.message[0]?.id || null })) || []
+      return NextResponse.json({ queries: queriesWithMessageId })
     }
   } catch (error) {
     console.error('Error in queries GET:', error)

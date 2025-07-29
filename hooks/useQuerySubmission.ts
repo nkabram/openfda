@@ -16,6 +16,7 @@ interface QueryResponse {
   fdaSections: string[]
   fdaData: any
   queryId?: string
+  messageId?: string
 }
 
 interface UseQuerySubmissionProps {

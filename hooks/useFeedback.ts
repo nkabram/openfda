@@ -21,12 +21,14 @@ export function useFeedback() {
     queryId,
     messageId,
     feedbackType,
-    feedbackText
+    feedbackText,
+    responseType
   }: {
     queryId?: string
     messageId?: string
     feedbackType: 'thumbs_up' | 'thumbs_down'
     feedbackText?: string
+    responseType: 'original' | 'follow_up'
   }) => {
     const response = await fetch('/api/feedback', {
       method: 'POST',
@@ -36,6 +38,7 @@ export function useFeedback() {
         messageId,
         feedbackType,
         feedbackText: feedbackText?.trim() || null,
+        responseType,
       }),
     })
 

@@ -27,12 +27,27 @@ async function getUserFromRequest(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { queryId, messageId, feedbackType, feedbackText } = await request.json()
+    const { queryId, messageId, feedbackType, feedbackText, responseType } = await request.json()
+    
+    console.log('🔍 Feedback API - Received data:', {
+      queryId,
+      messageId,
+      feedbackType,
+      feedbackText: feedbackText ? 'provided' : 'empty',
+      responseType
+    })
 
     // Validate required fields
     if (!feedbackType || !['thumbs_up', 'thumbs_down'].includes(feedbackType)) {
       return NextResponse.json(
         { error: 'Invalid feedback type' },
+        { status: 400 }
+      )
+    }
+
+    if (!responseType || !['original', 'follow_up'].includes(responseType)) {
+      return NextResponse.json(
+        { error: 'Invalid response type' },
         { status: 400 }
       )
     }
@@ -79,13 +94,24 @@ export async function POST(request: NextRequest) {
     }
 
     if (messageId) {
+      console.log('🔍 Feedback API - Looking for message with ID:', messageId)
+      
       const { data: message, error: messageError } = await supabase
         .from('fda_messages')
         .select('id, user_id, query_id')
         .eq('id', messageId)
         .single()
 
+      console.log('🔍 Feedback API - Message query result:', {
+        message,
+        error: messageError
+      })
+
       if (messageError || !message) {
+        console.error('❌ Feedback API - Message not found:', {
+          messageId,
+          error: messageError
+        })
         return NextResponse.json(
           { error: 'Message not found' },
           { status: 404 }
@@ -106,13 +132,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if feedback already exists for this user and response
-    const { data: existingFeedback, error: checkError } = await supabase
+    let query = supabase
       .from('response_feedback')
       .select('id')
       .eq('user_id', user.id)
-      .eq('query_id', finalQueryId || null)
-      .eq('message_id', messageId || null)
-      .single()
+      .eq('response_type', responseType)
+    
+    // Handle query_id - use .eq() for non-null values, .is() for null
+    if (finalQueryId) {
+      query = query.eq('query_id', finalQueryId)
+    } else {
+      query = query.is('query_id', null)
+    }
+    
+    // Handle message_id - use .eq() for non-null values, .is() for null
+    if (messageId) {
+      query = query.eq('message_id', messageId)
+    } else {
+      query = query.is('message_id', null)
+    }
+    
+    const { data: existingFeedback, error: checkError } = await query.single()
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
       console.error('Error checking existing feedback:', checkError)
@@ -128,6 +168,7 @@ export async function POST(request: NextRequest) {
       message_id: messageId || null,
       feedback_type: feedbackType,
       feedback_text: feedbackText || null,
+      response_type: responseType,
     }
 
     let result

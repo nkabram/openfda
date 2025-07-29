@@ -70,20 +70,37 @@ export function QueryInputForm({
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Textarea
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={placeholder}
-                  className="min-h-[100px] resize-none bg-background text-foreground placeholder:text-muted-foreground border-input"
-                  disabled={isLoading || disabled}
-                />
+                <div className="relative">
+                  <Textarea
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    className="min-h-[100px] resize-none bg-background text-foreground placeholder:text-muted-foreground border-input pr-12 md:pr-3"
+                    disabled={isLoading || disabled}
+                  />
+                  {/* Mobile Submit Button - positioned in lower right corner */}
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={!query.trim() || isLoading || disabled}
+                    className="absolute bottom-2 right-2 h-8 w-8 p-0 md:hidden bg-blue-500 hover:bg-blue-600 text-white border-0"
+                    title="Submit query"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
                 <div className="text-xs text-muted-foreground">
                   Press Enter to submit, Shift+Enter for new line
                 </div>
               </div>
               
-              <div className="flex justify-end">
+              {/* Desktop Submit Button - hidden on mobile */}
+              <div className="hidden md:flex justify-end">
                 <Button 
                   type="submit" 
                   disabled={!query.trim() || isLoading || disabled}

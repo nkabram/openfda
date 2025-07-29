@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
@@ -60,6 +60,7 @@ export function FeedbackModal({
         messageId,
         feedbackType,
         feedbackText: feedbackText.trim() || undefined,
+        responseType,
       })
 
       toast({
@@ -122,12 +123,12 @@ export function FeedbackModal({
             )}
             {getModalTitle()}
           </DialogTitle>
+          <DialogDescription>
+            {getModalDescription()}
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {getModalDescription()}
-          </p>
           
           <div className="space-y-2">
             <Label htmlFor="feedback-text" className="text-sm font-medium">
@@ -138,11 +139,17 @@ export function FeedbackModal({
               placeholder={getPlaceholderText()}
               value={feedbackText}
               onChange={(e) => setFeedbackText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault()
+                  handleSubmit()
+                }
+              }}
               className="min-h-[100px] resize-none"
               maxLength={2000}
             />
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {feedbackText.length}/2000 characters
+              {feedbackText.length}/2000 characters • Press Ctrl+Enter to submit
             </p>
           </div>
 

@@ -304,6 +304,7 @@ Please provide a helpful response to the user's question, focusing on the specif
     const response = completion.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response to your question.'
 
     let queryId = null
+    let messageId = null
     
     // Save to database if requested
     console.log('saveToDatabase:', saveToDatabase, 'userId:', userId)
@@ -329,6 +330,25 @@ Please provide a helpful response to the user's question, focusing on the specif
         } else {
           console.log('Query saved successfully with ID:', savedQuery.id)
           queryId = savedQuery.id
+
+          // Also save the AI response as the first message in the chat
+          const { data: savedMessage, error: messageError } = await supabase
+            .from('fda_messages')
+            .insert({
+              query_id: queryId,
+              message_type: 'answer',
+              content: response,
+              follow_up_mode: 'original_query',
+            })
+            .select('id')
+            .single()
+
+          if (messageError) {
+            console.error('Error saving initial message:', messageError)
+          } else {
+            console.log('Initial message saved successfully with ID:', savedMessage.id)
+            messageId = savedMessage.id
+          }
         }
       } catch (error) {
         console.error('Error saving to database:', error)
@@ -341,7 +361,8 @@ Please provide a helpful response to the user's question, focusing on the specif
       intents: intents || [],
       fdaSections: fdaSections || [],
       fdaData: fdaData || null,
-      queryId
+      queryId,
+      messageId
     })
   } catch (error) {
     console.error('Error generating response:', error)

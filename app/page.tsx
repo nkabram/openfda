@@ -341,20 +341,26 @@ export default function Home() {
               
               {/* Form Area - Scrollable */}
               <div className="flex-1 overflow-y-auto p-3 lg:p-6">
-                <MedicationQueryForm 
-                  onQuerySaved={handleQuerySaved}
-                  selectedQuery={selectedQuery}
-                  newQueryTrigger={newQueryTrigger}
-                />
+                <div className="min-h-full flex flex-col">
+                  <div className="flex-1">
+                    <MedicationQueryForm 
+                      onQuerySaved={handleQuerySaved}
+                      selectedQuery={selectedQuery}
+                      newQueryTrigger={newQueryTrigger}
+                    />
+                  </div>
+                  
+                  {/* Bottom Links - positioned at bottom of content area */}
+                  <div className="mt-8 pt-4 flex justify-end gap-2">
+                    <ProjectConsentModal />
+                    <DisclaimerModal />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
           
-          {/* Fixed Disclaimer and Project Info - responsive positioning */}
-          <div className="fixed bottom-2 right-2 lg:bottom-4 lg:right-4 z-30 flex flex-col items-end gap-2">
-            <ProjectConsentModal />
-            <DisclaimerModal />
-          </div>
+
         </div>
       </AuthGuard>
     </>

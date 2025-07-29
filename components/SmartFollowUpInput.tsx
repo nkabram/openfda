@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, Pill, Globe, Brain } from 'lucide-react'
+import { Loader2, Pill, Globe, Brain, Send } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import ProcessStream from '@/components/process-stream'
@@ -399,15 +399,31 @@ function SmartFollowUpInput({ queryId, onMessageAdded, disabled = false }: Smart
 
           {/* Smart Follow-up Input */}
           <form onSubmit={handleSubmit}>
-            <Textarea
-              ref={textareaRef}
-              placeholder="Ask a follow-up question (press Enter to submit)"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="min-h-[60px] resize-none bg-white dark:bg-slate-700/70 border border-slate-300 dark:border-slate-600/60 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none focus:border-ring/50"
-              disabled={isLoading || disabled}
-            />
+            <div className="relative">
+              <Textarea
+                ref={textareaRef}
+                placeholder="Ask a follow-up question"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="min-h-[60px] resize-none bg-white dark:bg-slate-700/70 border border-slate-300 dark:border-slate-600/60 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none focus:border-ring/50 pr-12 md:pr-3"
+                disabled={isLoading || disabled}
+              />
+              {/* Mobile Submit Button - positioned in lower right corner */}
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!question.trim() || isLoading || disabled}
+                className="absolute bottom-2 right-2 h-8 w-8 p-0 md:hidden bg-blue-500 hover:bg-blue-600 text-white border-0"
+                title="Submit follow-up question"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </form>
         </div>
       </CardContent>

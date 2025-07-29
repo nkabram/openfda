@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -17,20 +17,14 @@ import { QueryResponse } from '@/components/query/QueryResponse'
 import { QueryProgress } from '@/components/query/QueryProgress'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
+import { useFeedback } from '@/hooks/useFeedback'
+import { FeedbackModal } from '@/components/FeedbackModal'
+import { useStickyDetails } from '@/hooks/useStickyDetails'
 
 interface ProgressStep {
   id: string;
   label: string;
   status: 'pending' | 'active' | 'completed' | 'error';
-}
-
-interface MedicationQueryResponse {
-  response: string
-  medication: string | null
-  intents: string[]
-  fdaSections: string[]
-  fdaData: any
-  queryId?: string
 }
 
 interface FollowUpMessage {
@@ -75,6 +69,11 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [followUpMessages, setFollowUpMessages] = useState<FollowUpMessage[]>([])
   const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
+  const responseContentRef = useRef<HTMLDivElement>(null)
+  const { isSticky, stickyTop, buttonRef } = useStickyDetails({ 
+    isOpen: isDetailedExplanationOpen, 
+    contentRef: responseContentRef 
+  })
   const [followUpDetailStates, setFollowUpDetailStates] = useState<{[key: string]: boolean}>({})
   const [needsMoreInfoPrompt, setNeedsMoreInfoPrompt] = useState<{
     show: boolean
@@ -398,9 +397,23 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="min-h-[120px] resize-none bg-white dark:bg-slate-700/70 border border-slate-300 dark:border-slate-600/60 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none focus:border-ring/50"
+                    className="min-h-[120px] resize-none bg-white dark:bg-slate-700/70 border border-slate-300 dark:border-slate-600/60 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none focus:border-ring/50 pr-12 md:pr-3"
                     disabled={isLoading}
                   />
+                  {/* Mobile Submit Button - positioned in lower right corner */}
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={!query.trim() || isLoading}
+                    className="absolute bottom-2 right-2 h-8 w-8 p-0 md:hidden bg-blue-500 hover:bg-blue-600 text-white border-0"
+                    title="Submit query"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
                 {response && (
                   <div className="flex justify-end">
@@ -469,12 +482,20 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                       <div className="flex justify-end">
                         <Collapsible.Trigger asChild>
                           <Button 
+                            ref={buttonRef}
                             variant="ghost" 
                             size="sm"
-                            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 h-auto p-1 text-xs"
+                            className={`text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 h-auto p-2 text-xs transition-all duration-200 ${
+                              isSticky 
+                                ? 'fixed right-4 z-50 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 shadow-lg rounded-md' 
+                                : ''
+                            }`}
+                            style={isSticky ? { top: `${stickyTop}px` } : {}}
                           >
                             <div className="flex items-center gap-1">
-                              <span className="font-medium">More details</span>
+                              <span className="font-medium">
+                                {isDetailedExplanationOpen ? 'Hide details' : 'More details'}
+                              </span>
                               {isDetailedExplanationOpen ? (
                                 <ChevronUp className="h-3 w-3" />
                               ) : (
@@ -602,9 +623,8 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                     {/* Feedback buttons for original response */}
                     <div className="flex justify-end mt-3">
                       <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                        <span>Was this helpful?</span>
                         <FeedbackButtons 
-                          queryId={currentQueryId || undefined}
+                          messageId={response.messageId || undefined}
                           responseType="original"
                         />
                       </div>
@@ -742,7 +762,6 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                     {/* Feedback buttons for follow-up answers */}
                     <div className="flex justify-end mt-3">
                       <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                        <span>Was this helpful?</span>
                         <FeedbackButtons 
                           messageId={message.id}
                           responseType="follow_up"
