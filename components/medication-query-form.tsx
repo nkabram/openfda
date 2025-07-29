@@ -452,7 +452,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
         )}
       </Card>
 
-      {/* Response Section */}
+      {/* Response Section! */}
       {response && (
         <div className="space-y-4">
               <div className="flex items-center gap-3">
