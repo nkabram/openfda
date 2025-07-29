@@ -12,9 +12,23 @@ export function getOAuthRedirectUrl(): string {
     return `${baseUrl}/auth/callback`
   }
 
+  // For GitHub Codespaces, use the codespace URL
+  if (window.location.hostname.includes('.app.github.dev')) {
+    const origin = window.location.origin
+    console.log('🚀 GitHub Codespace detected:', origin)
+    return `${origin}/auth/callback`
+  }
+  
+  // For local development
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const origin = window.location.origin
+    console.log('🏠 Local development detected:', origin)
+    return `${origin}/auth/callback`
+  }
+
   // Always use the current window location origin for maximum compatibility
   const origin = window.location.origin
-  console.log('🌐 Detected origin for OAuth:', origin)
+  console.log('🌐 Using current origin for OAuth:', origin)
   
   return `${origin}/auth/callback`
 }
@@ -29,7 +43,8 @@ export function isDevelopment(): boolean {
   
   return window.location.hostname === 'localhost' || 
          window.location.hostname === '127.0.0.1' ||
-         window.location.hostname.includes('.local')
+         window.location.hostname.includes('.local') ||
+         window.location.hostname.includes('.app.github.dev')  // GitHub Codespaces
 }
 
 /**

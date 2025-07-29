@@ -10,6 +10,7 @@ import * as Collapsible from '@radix-ui/react-collapsible'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import SmartFollowUpInput from '@/components/SmartFollowUpInput'
+import { FeedbackButtons } from '@/components/FeedbackButtons'
 import { useQuerySubmission } from '@/hooks/useQuerySubmission'
 import { QueryInputForm } from '@/components/query/QueryInputForm'
 import { QueryResponse } from '@/components/query/QueryResponse'
@@ -597,6 +598,17 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                         </div>
                       </Collapsible.Content>
                     </Collapsible.Root>
+                    
+                    {/* Feedback buttons for original response */}
+                    <div className="flex justify-end mt-3">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span>Was this helpful?</span>
+                        <FeedbackButtons 
+                          queryId={currentQueryId || undefined}
+                          responseType="original"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -726,6 +738,17 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                         </div>
                       )
                     })()}
+                    
+                    {/* Feedback buttons for follow-up answers */}
+                    <div className="flex justify-end mt-3">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span>Was this helpful?</span>
+                        <FeedbackButtons 
+                          messageId={message.id}
+                          responseType="follow_up"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
