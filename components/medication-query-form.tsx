@@ -507,7 +507,14 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                       </div>
                   
                       <Collapsible.Content className="data-[state=open]:animate-slideDown data-[state=closed]:animate-slideUp overflow-hidden">
-                        <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner mt-2">
+                        <div 
+                          className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/30 dark:to-gray-900/30 border border-slate-200 dark:border-slate-700 rounded-xl shadow-inner mt-2"
+                          onDoubleClick={() => {
+                            // Double-click to collapse details on any screen size
+                            setIsDetailedExplanationOpen(false)
+                          }}
+                          style={{ touchAction: 'manipulation' }} // Improves double-tap on mobile
+                        >
                           <div className="prose prose-sm max-w-none dark:prose-invert
                             prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-headings:font-semibold prose-headings:mb-3 prose-headings:mt-4 first:prose-headings:mt-0
                             prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4

@@ -354,6 +354,7 @@ export default function Home() {
                   <div className="mt-8 pt-4 flex justify-end gap-2">
                     <ProjectConsentModal />
                     <DisclaimerModal />
+                     {/* Bottom footer */}
                   </div>
                 </div>
               </div>
