@@ -770,6 +770,7 @@ export function MedicationQueryForm({ onQuerySaved, selectedQuery, newQueryTrigg
                     <div className="flex justify-end mt-3">
                       <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                         <FeedbackButtons 
+                          queryId={response.queryId || currentQueryId || undefined}
                           messageId={message.id}
                           responseType="follow_up"
                         />
