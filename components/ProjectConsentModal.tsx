@@ -12,7 +12,7 @@ export function ProjectConsentModal() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button className="text-blue-500 hover:text-blue-400 dark:text-blue-400 dark:hover:text-blue-300 underline transition-colors text-sm">
-          Project Information & Consent
+          Project info
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[700px] max-h-[80vh]">
